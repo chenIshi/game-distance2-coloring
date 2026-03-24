@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "game-distance2-coloring"
+version = "0.1.0"
+description = "Distance-2 coloring game solver for small graphs."
+requires-python = ">=3.11"
+
+[project.scripts]
+game-coloring = "game_coloring.cli:main"
