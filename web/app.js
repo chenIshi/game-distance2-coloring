@@ -1,8 +1,10 @@
 const COLOR_SWATCHES = ["#4c956c", "#d68c45", "#8d5a97", "#2d728f", "#c75146"];
+const STORAGE_KEY = "distance2-game-progress";
 
 const state = {
   data: null,
   caseMap: new Map(),
+  caseOrder: [],
   currentCaseId: null,
   humanRole: "Alice",
   currentPlayer: "Alice",
@@ -10,12 +12,18 @@ const state = {
   owners: [],
   selectedVertex: null,
   message: "",
+  progress: {},
+  openDrawerId: null,
 };
 
-const caseSelect = document.querySelector("#case-select");
 const roleAliceButton = document.querySelector("#role-alice");
 const roleBobButton = document.querySelector("#role-bob");
 const restartButton = document.querySelector("#restart-button");
+const openLevelsButton = document.querySelector("#open-levels");
+const openGamePanelButton = document.querySelector("#open-game-panel");
+const openNextMoveButton = document.querySelector("#open-next-move");
+const openHowToButton = document.querySelector("#open-how-to");
+const levelList = document.querySelector("#level-list");
 const titleLabel = document.querySelector("#case-title");
 const summaryLabel = document.querySelector("#case-summary");
 const progressChip = document.querySelector("#progress-chip");
@@ -25,7 +33,16 @@ const selectionLabel = document.querySelector("#selection-label");
 const messageLabel = document.querySelector("#message-label");
 const graphBoard = document.querySelector("#graph-board");
 const colorButtons = document.querySelector("#color-buttons");
-const statusBox = turnLabel.closest(".status-box");
+const resultOverlay = document.querySelector("#result-overlay");
+const overlayEyebrow = document.querySelector("#overlay-eyebrow");
+const overlayTitle = document.querySelector("#overlay-title");
+const overlayBody = document.querySelector("#overlay-body");
+const overlayRestart = document.querySelector("#overlay-restart");
+const overlayNext = document.querySelector("#overlay-next");
+const overlaySwitchRole = document.querySelector("#overlay-switch-role");
+const drawerBackdrop = document.querySelector("#drawer-backdrop");
+const drawers = Array.from(document.querySelectorAll(".drawer"));
+const drawerCloseButtons = Array.from(document.querySelectorAll(".drawer-close"));
 
 function encodeState(colors, currentPlayer) {
   return `${colors.join(".")}|${currentPlayer[0]}`;
@@ -40,9 +57,103 @@ function getCurrentStateData() {
   return currentCase.states[encodeState(state.colors, state.currentPlayer)];
 }
 
+function isGameOver() {
+  const currentState = getCurrentStateData();
+  return currentState.finished || currentState.deadVertices.length > 0;
+}
+
+function didHumanWin() {
+  const currentState = getCurrentStateData();
+  if (currentState.finished) {
+    return state.humanRole === "Alice";
+  }
+  if (currentState.deadVertices.length > 0) {
+    return state.humanRole === "Bob";
+  }
+  return false;
+}
+
+function loadProgress() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    state.progress = raw ? JSON.parse(raw) : {};
+  } catch {
+    state.progress = {};
+  }
+}
+
+function saveProgress() {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
+  } catch {
+    state.progress = state.progress;
+  }
+}
+
+function progressKey(caseId, role) {
+  return `${role}:${caseId}`;
+}
+
+function isLevelDone(caseId, role) {
+  return Boolean(state.progress[progressKey(caseId, role)]);
+}
+
+function markCurrentLevelDone() {
+  state.progress[progressKey(state.currentCaseId, state.humanRole)] = true;
+  saveProgress();
+}
+
+function maybeRecordCompletion() {
+  if (!isGameOver()) {
+    return;
+  }
+
+  const currentCase = getCurrentCase();
+  const levelIsSolvableForHuman = currentCase.initialWinner === state.humanRole;
+  if (levelIsSolvableForHuman) {
+    if (didHumanWin()) {
+      markCurrentLevelDone();
+    }
+    return;
+  }
+  markCurrentLevelDone();
+}
+
 function setMessage(message) {
   state.message = message;
   messageLabel.textContent = message;
+}
+
+function openDrawer(drawerId) {
+  state.openDrawerId = drawerId;
+  for (const drawer of drawers) {
+    drawer.classList.toggle("hidden", drawer.id !== drawerId);
+  }
+  drawerBackdrop.classList.toggle("hidden", !drawerId);
+}
+
+function closeDrawer() {
+  state.openDrawerId = null;
+  for (const drawer of drawers) {
+    drawer.classList.add("hidden");
+  }
+  drawerBackdrop.classList.add("hidden");
+}
+
+function toggleDrawer(drawerId) {
+  if (state.openDrawerId === drawerId) {
+    closeDrawer();
+    return;
+  }
+  openDrawer(drawerId);
+}
+
+function getNextCaseId() {
+  const currentIndex = state.caseOrder.indexOf(state.currentCaseId);
+  if (currentIndex === -1) {
+    return state.caseOrder[0];
+  }
+  return state.caseOrder[(currentIndex + 1) % state.caseOrder.length];
 }
 
 function resetGame() {
@@ -51,11 +162,11 @@ function resetGame() {
   state.owners = new Array(currentCase.size).fill(null);
   state.currentPlayer = "Alice";
   state.selectedVertex = null;
-  setMessage("Select a vertex to begin.");
+  setMessage("Select a vertex to begin this round.");
   render();
 
   if (state.humanRole !== state.currentPlayer) {
-    window.setTimeout(playComputerTurn, 350);
+    window.setTimeout(playComputerTurn, 380);
   }
 }
 
@@ -69,75 +180,111 @@ function setRole(role) {
 
 function chooseCase(caseId) {
   state.currentCaseId = caseId;
+  closeDrawer();
   resetGame();
+}
+
+function renderLevelCards() {
+  levelList.innerHTML = "";
+
+  for (const caseId of state.caseOrder) {
+    const item = state.caseMap.get(caseId);
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "level-card";
+    if (item.id === state.currentCaseId) {
+      card.classList.add("active");
+    }
+    if (isLevelDone(item.id, state.humanRole)) {
+      card.classList.add("done");
+    }
+
+    const topline = document.createElement("div");
+    topline.className = "level-topline";
+
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+
+    const tag = document.createElement("span");
+    tag.className = "level-tag";
+    tag.textContent = isLevelDone(item.id, state.humanRole)
+      ? "Done"
+      : item.challenge
+        ? "Challenge"
+        : "Core";
+
+    const teaser = document.createElement("p");
+    teaser.textContent = item.summary;
+    teaser.className = "drawer-copy";
+
+    topline.appendChild(title);
+    topline.appendChild(tag);
+    card.appendChild(topline);
+    card.appendChild(teaser);
+    card.addEventListener("click", () => chooseCase(item.id));
+    levelList.appendChild(card);
+  }
 }
 
 function renderCaseControls() {
   const currentCase = getCurrentCase();
   titleLabel.textContent = currentCase.title;
   summaryLabel.textContent = currentCase.summary;
-  progressChip.textContent = currentCase.challenge ? "Optional challenge" : "Main lesson";
   progressChip.className = "chip";
-  caseSelect.value = state.currentCaseId;
+  progressChip.textContent = currentCase.challenge ? "Challenge level" : "Core level";
 }
 
 function renderStatus() {
   const currentState = getCurrentStateData();
-  statusBox.classList.remove("state-safe", "state-danger", "state-finished", "state-win");
   progressChip.classList.remove("is-safe", "is-danger", "is-finished", "is-win");
 
   turnLabel.textContent = `Current turn: ${state.currentPlayer}`;
+
   if (currentState.finished) {
     if (state.humanRole === "Alice") {
-      statusBox.classList.add("state-win");
       progressChip.classList.add("is-win");
-      progressChip.textContent = "You won";
+      progressChip.textContent = "Level cleared";
     } else {
-      statusBox.classList.add("state-finished");
       progressChip.classList.add("is-finished");
-      progressChip.textContent = "Alice won";
+      progressChip.textContent = "Alice finished it";
     }
     stateLabel.textContent =
       state.humanRole === "Alice"
-        ? "All dots are colored. You finished the game successfully."
-        : "All dots are colored, so Alice completed the game.";
+        ? "Every vertex is colored. You cleared the level."
+        : "Every vertex is colored, so Alice completed the puzzle.";
     return;
   }
+
   if (currentState.deadVertices.length > 0) {
-    statusBox.classList.add("state-danger");
     progressChip.classList.add("is-danger");
-    progressChip.textContent = state.humanRole === "Bob" ? "You won" : "You got stuck";
+    progressChip.textContent = state.humanRole === "Bob" ? "Trap complete" : "You got trapped";
     stateLabel.textContent =
       state.humanRole === "Bob"
-        ? "A dead dot appeared, so Bob won this round."
-        : "A dead vertex appeared, so Bob won this round. Restart and try a different choice.";
+        ? "A dead vertex appeared, so Bob wins this level."
+        : "A dead vertex appeared, so Bob wins this level. Replay and try another line.";
     return;
   }
 
   if (state.humanRole === "Alice") {
     if (currentState.aliceWins) {
-      statusBox.classList.add("state-safe");
       progressChip.classList.add("is-safe");
-      progressChip.textContent = "You are still on track";
-      stateLabel.textContent = "Alice can still reach a full coloring from here.";
+      progressChip.textContent = "Still alive";
+      stateLabel.textContent = "Alice can still force a full coloring from here.";
     } else {
-      statusBox.classList.add("state-danger");
       progressChip.classList.add("is-danger");
-      progressChip.textContent = "Warning";
-      stateLabel.textContent = "This position is slipping away. Bob can force a win unless you go back and change the line.";
+      progressChip.textContent = "Danger";
+      stateLabel.textContent = "Bob can force a trap from this position.";
     }
     return;
   }
 
   if (currentState.aliceWins) {
-    statusBox.classList.add("state-danger");
     progressChip.classList.add("is-danger");
-    progressChip.textContent = "Warning";
-    stateLabel.textContent = "Alice can still recover from this position.";
+    progressChip.textContent = "Alice can recover";
+    stateLabel.textContent = "Alice still has a route to finish the graph.";
   } else {
-    statusBox.classList.add("state-safe");
     progressChip.classList.add("is-safe");
-    progressChip.textContent = "You are pressuring Alice";
+    progressChip.textContent = "Trap pressure";
     stateLabel.textContent = "Bob still has enough pressure to force a dead vertex.";
   }
 }
@@ -155,7 +302,8 @@ function renderColorButtons() {
     legalByVertex.get(move.vertex).add(move.color);
   }
 
-  const selectedLegalColors = state.selectedVertex === null ? new Set() : legalByVertex.get(state.selectedVertex) ?? new Set();
+  const selectedLegalColors =
+    state.selectedVertex === null ? new Set() : legalByVertex.get(state.selectedVertex) ?? new Set();
 
   for (let color = 1; color <= currentCase.k; color += 1) {
     const button = document.createElement("button");
@@ -164,7 +312,11 @@ function renderColorButtons() {
     button.textContent = `Color ${color}`;
     button.style.backgroundColor = COLOR_SWATCHES[(color - 1) % COLOR_SWATCHES.length];
     button.style.color = "#fff";
-    button.disabled = state.humanRole !== state.currentPlayer || state.selectedVertex === null || !selectedLegalColors.has(color);
+    button.disabled =
+      state.humanRole !== state.currentPlayer ||
+      state.selectedVertex === null ||
+      isGameOver() ||
+      !selectedLegalColors.has(color);
     button.classList.toggle("active", selectedLegalColors.has(color));
     button.addEventListener("click", () => makeHumanMove(state.selectedVertex, color));
     colorButtons.appendChild(button);
@@ -221,7 +373,7 @@ function renderBoard() {
     inner.setAttribute("cy", position.y);
     inner.setAttribute("r", 21);
     const color = state.colors[vertex];
-    inner.setAttribute("fill", color === 0 ? "#f3ede5" : COLOR_SWATCHES[(color - 1) % COLOR_SWATCHES.length]);
+    inner.setAttribute("fill", color === 0 ? "rgba(235, 228, 216, 0.95)" : COLOR_SWATCHES[(color - 1) % COLOR_SWATCHES.length]);
 
     const vertexLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
     vertexLabel.setAttribute("class", "vertex-label");
@@ -263,36 +415,73 @@ function renderBoard() {
 
 function renderSelectionHint() {
   const currentState = getCurrentStateData();
-    const suggestedMove = currentState.optimalMoves[0] ?? currentState.legalMoves[0];
+  const suggestedMove = currentState.optimalMoves[0] ?? currentState.legalMoves[0];
+
+  if (isGameOver()) {
+    selectionLabel.textContent = "Round over. Replay this level or move to the next one.";
+    return;
+  }
+
   if (state.selectedVertex === null) {
     if (state.currentPlayer === state.humanRole && suggestedMove) {
-      selectionLabel.textContent = `Suggested move: pick Vertex ${suggestedMove.vertex + 1}, then choose color ${suggestedMove.color}.`;
+      selectionLabel.textContent = `Suggested move: choose Vertex ${suggestedMove.vertex + 1}, then use color ${suggestedMove.color}.`;
     } else {
-      selectionLabel.textContent = "Select a vertex to see which colors are allowed.";
+      selectionLabel.textContent = "Wait for the computer move, or inspect the board.";
     }
     return;
   }
 
   const moves = currentState.legalMoves.filter((move) => move.vertex === state.selectedVertex);
   if (moves.length === 0) {
-    selectionLabel.textContent = `Vertex ${state.selectedVertex + 1} is dead. No color can be used there now.`;
+    selectionLabel.textContent = `Vertex ${state.selectedVertex + 1} is dead. No legal color remains there.`;
     return;
   }
 
   selectionLabel.textContent = `Vertex ${state.selectedVertex + 1} can use color${moves.length > 1 ? "s" : ""} ${moves.map((move) => move.color).join(", ")}.`;
 }
 
+function renderOverlay() {
+  const currentState = getCurrentStateData();
+  if (!currentState.finished && currentState.deadVertices.length === 0) {
+    resultOverlay.classList.add("hidden");
+    return;
+  }
+
+  resultOverlay.classList.remove("hidden");
+
+  if (currentState.finished) {
+    overlayEyebrow.textContent = "Level Cleared";
+    overlayTitle.textContent =
+      state.humanRole === "Alice" ? "You finished the graph." : "Alice completed the graph.";
+    overlayBody.textContent =
+      state.humanRole === "Alice"
+        ? "Every vertex stayed alive long enough to be colored. Replay to try a cleaner route, or move on."
+        : "Bob could not create a trap in time. Try another level or switch sides.";
+  } else {
+    overlayEyebrow.textContent = "Trap Triggered";
+    overlayTitle.textContent =
+      state.humanRole === "Bob" ? "You trapped a vertex." : "Bob trapped the graph.";
+    overlayBody.textContent =
+      state.humanRole === "Bob"
+        ? "One uncolored vertex ran out of legal colors. Replay to sharpen the trap, or move on."
+        : "At least one uncolored vertex had no legal color left. Replay and try a different order.";
+  }
+}
+
 function render() {
+  maybeRecordCompletion();
+  renderLevelCards();
   renderCaseControls();
   renderStatus();
   renderSelectionHint();
   renderColorButtons();
   renderBoard();
+  renderOverlay();
 }
 
 function selectVertex(vertex) {
   const currentState = getCurrentStateData();
-  if (state.currentPlayer !== state.humanRole) {
+  if (state.currentPlayer !== state.humanRole || isGameOver()) {
     return;
   }
 
@@ -334,7 +523,7 @@ function makeHumanMove(vertex, color) {
 
   const nextState = getCurrentStateData();
   if (!nextState.finished && nextState.deadVertices.length === 0 && state.currentPlayer !== state.humanRole) {
-    window.setTimeout(playComputerTurn, 450);
+    window.setTimeout(playComputerTurn, 420);
   }
 }
 
@@ -351,23 +540,36 @@ function playComputerTurn() {
   render();
 }
 
+function playNextLevel() {
+  chooseCase(getNextCaseId());
+}
+
+function switchRole() {
+  setRole(state.humanRole === "Alice" ? "Bob" : "Alice");
+}
+
 async function init() {
   const response = await fetch("./data/cases.json");
   state.data = await response.json();
   state.caseMap = new Map(state.data.cases.map((item) => [item.id, item]));
+  state.caseOrder = state.data.cases.map((item) => item.id);
+  loadProgress();
+  state.currentCaseId = state.caseOrder[0];
 
-  for (const item of state.data.cases) {
-    const option = document.createElement("option");
-    option.value = item.id;
-    option.textContent = item.challenge ? `${item.title} (challenge)` : item.title;
-    caseSelect.appendChild(option);
-  }
-
-  state.currentCaseId = state.data.cases[0].id;
   roleAliceButton.addEventListener("click", () => setRole("Alice"));
   roleBobButton.addEventListener("click", () => setRole("Bob"));
   restartButton.addEventListener("click", resetGame);
-  caseSelect.addEventListener("change", (event) => chooseCase(event.target.value));
+  overlayRestart.addEventListener("click", resetGame);
+  overlayNext.addEventListener("click", playNextLevel);
+  overlaySwitchRole.addEventListener("click", switchRole);
+  openLevelsButton.addEventListener("click", () => toggleDrawer("levels-drawer"));
+  openGamePanelButton.addEventListener("click", () => toggleDrawer("game-drawer"));
+  openNextMoveButton.addEventListener("click", () => toggleDrawer("next-move-drawer"));
+  openHowToButton.addEventListener("click", () => toggleDrawer("how-to-drawer"));
+  drawerBackdrop.addEventListener("click", closeDrawer);
+  for (const button of drawerCloseButtons) {
+    button.addEventListener("click", () => closeDrawer());
+  }
 
   setRole("Alice");
 }

@@ -7,86 +7,117 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <section class="hero">
-        <p class="eyebrow">Distance-2 Coloring Game</p>
-        <h1>Learn the game by playing it.</h1>
-        <p class="intro">
-          Pick a preset graph, choose whether you want to act as Alice or Bob, and
-          play against the solver. A color is blocked if the same color already appears
-          on the selected vertex, a neighbor, or a neighbor-of-a-neighbor.
-        </p>
-      </section>
+    <main class="game-shell">
+      <header class="top-hud">
+        <div class="brand-block">
+          <p class="eyebrow">Distance-2 Coloring Game</p>
+          <h1>Play the graph. Learn the trap.</h1>
+        </div>
+        <div class="hud-actions">
+          <button id="open-levels" type="button">Levels</button>
+          <button id="open-game-panel" type="button">Game</button>
+          <button id="open-next-move" type="button">Next Move</button>
+          <button id="open-how-to" type="button">How To</button>
+        </div>
+      </header>
 
-      <section class="controls">
-        <label class="control">
-          <span>Case</span>
-          <select id="case-select"></select>
-        </label>
-
-        <div class="control">
-          <span>Your role</span>
-          <div class="segmented">
-            <button id="role-alice" type="button">Play as Alice</button>
-            <button id="role-bob" type="button">Play as Bob</button>
+      <section class="playfield">
+        <aside class="status-hud">
+          <p class="eyebrow">Status</p>
+          <div class="status-head">
+            <h2 id="case-title">Loading…</h2>
+            <span class="chip" id="progress-chip"></span>
           </div>
-        </div>
+          <p id="case-summary" class="summary"></p>
+          <p id="turn-label" class="turn-line"></p>
+          <p id="state-label" class="state-line"></p>
+        </aside>
 
-        <div class="control actions">
-          <button id="restart-button" type="button">Restart</button>
-        </div>
-      </section>
-
-      <section class="learn-strip">
-        <article class="learn-card">
-          <h2>How To Read The Game</h2>
-          <p>
-            Alice wants every vertex to be colored legally. Bob wins as soon as even one
-            uncolored vertex has no color left.
-          </p>
-        </article>
-        <article class="learn-card">
-          <h2>Glossary</h2>
-          <ul>
-            <li><strong>Vertex:</strong> one point in the graph.</li>
-            <li><strong>Distance 2:</strong> up to two edges away.</li>
-            <li><strong>Dead vertex:</strong> an uncolored vertex with no allowed color left.</li>
-          </ul>
-        </article>
-      </section>
-
-      <section class="layout">
-        <div class="board-card">
-          <div class="board-header">
-            <div>
-              <h2 id="case-title">Loading…</h2>
-              <p id="case-summary"></p>
-            </div>
-            <div class="chip-row">
-              <span class="chip" id="progress-chip"></span>
+        <section class="graph-stage">
+          <div class="board-frame">
+            <svg id="graph-board" viewBox="0 0 520 340" aria-label="Game graph"></svg>
+            <div id="result-overlay" class="result-overlay hidden" aria-live="polite">
+              <div class="result-card">
+                <p class="eyebrow" id="overlay-eyebrow">Round Over</p>
+                <h3 id="overlay-title"></h3>
+                <p id="overlay-body"></p>
+                <div class="overlay-actions">
+                  <button id="overlay-restart" type="button">Play Again</button>
+                  <button id="overlay-next" type="button">Next Level</button>
+                  <button id="overlay-switch-role" type="button">Switch Side</button>
+                </div>
+              </div>
             </div>
           </div>
-          <svg id="graph-board" viewBox="0 0 520 340" aria-label="Game graph"></svg>
+
           <div class="palette">
-            <p>Pick a color for the selected vertex:</p>
+            <p>Choose a color for the selected vertex:</p>
             <div id="color-buttons" class="color-buttons"></div>
           </div>
-        </div>
-
-        <aside class="info-card">
-          <div class="status-box">
-            <h3>Status</h3>
-            <p id="turn-label"></p>
-            <p id="state-label"></p>
-          </div>
-
-          <div class="status-box">
-            <h3>Next Suggestion</h3>
-            <p id="selection-label">Select a vertex to see allowed colors.</p>
-            <p id="message-label"></p>
-          </div>
-        </aside>
+        </section>
       </section>
+
+      <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
+
+      <aside id="levels-drawer" class="drawer hidden">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow">Levels</p>
+            <h2>Choose a puzzle</h2>
+          </div>
+          <button class="drawer-close" data-close-drawer="levels-drawer" type="button">Close</button>
+        </div>
+        <div id="level-list" class="level-list"></div>
+      </aside>
+
+      <aside id="game-drawer" class="drawer hidden">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow">Game Panel</p>
+            <h2>Choose your side</h2>
+          </div>
+          <button class="drawer-close" data-close-drawer="game-drawer" type="button">Close</button>
+        </div>
+        <p class="drawer-copy">
+          Alice tries to complete every vertex. Bob tries to create one dead vertex.
+        </p>
+        <div class="segmented">
+          <button id="role-alice" type="button">Play as Alice</button>
+          <button id="role-bob" type="button">Play as Bob</button>
+        </div>
+      </aside>
+
+      <aside id="next-move-drawer" class="drawer hidden">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow">Next Move</p>
+            <h2>Current suggestion</h2>
+          </div>
+          <button class="drawer-close" data-close-drawer="next-move-drawer" type="button">Close</button>
+        </div>
+        <p id="selection-label" class="drawer-copy">Select a vertex to see which colors are allowed.</p>
+        <p id="message-label" class="drawer-copy"></p>
+      </aside>
+
+      <aside id="how-to-drawer" class="drawer hidden">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow">How To Play</p>
+            <h2>Quick rules</h2>
+          </div>
+          <button class="drawer-close" data-close-drawer="how-to-drawer" type="button">Close</button>
+        </div>
+        <ul class="rules-list">
+          <li><strong>Alice:</strong> finish coloring every vertex.</li>
+          <li><strong>Bob:</strong> trap one uncolored vertex so no legal color remains.</li>
+          <li><strong>Distance 2:</strong> the same color cannot repeat within two edges.</li>
+          <li><strong>A / B badge:</strong> shows who colored that vertex.</li>
+        </ul>
+      </aside>
+
+      <div class="bottom-bar">
+        <button id="restart-button" type="button">Restart Level</button>
+      </div>
     </main>
 
     <script type="module" src="./app.js"></script>
