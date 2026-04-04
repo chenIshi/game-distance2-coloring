@@ -92,6 +92,26 @@ Run the test suite with:
 python3 -m unittest discover -s tests
 ```
 
+## Web Demo
+
+The repo also includes a static teaching demo under `web/`.
+
+Generate the preset case data with:
+
+```bash
+python3 scripts/export_web_cases.py
+```
+
+Then serve the repo locally with any static file server, for example:
+
+```bash
+python3 -m http.server 8000
+```
+
+After that, open `http://localhost:8000/web/`.
+
+The intended deployment target for this demo is GitHub Pages, so the frontend is plain static HTML, CSS, JavaScript, and JSON.
+
 ## Current Scope
 
 The current implementation includes:

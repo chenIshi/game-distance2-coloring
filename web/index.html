@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Distance-2 Coloring Game</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="eyebrow">Distance-2 Coloring Game</p>
+        <h1>Learn the game by playing it.</h1>
+        <p class="intro">
+          Pick a preset graph, choose whether you want to act as Alice or Bob, and
+          play against the solver. A color is blocked if the same color already appears
+          on the selected vertex, a neighbor, or a neighbor-of-a-neighbor.
+        </p>
+      </section>
+
+      <section class="controls">
+        <label class="control">
+          <span>Case</span>
+          <select id="case-select"></select>
+        </label>
+
+        <div class="control">
+          <span>Your role</span>
+          <div class="segmented">
+            <button id="role-alice" type="button">Play as Alice</button>
+            <button id="role-bob" type="button">Play as Bob</button>
+          </div>
+        </div>
+
+        <div class="control actions">
+          <button id="restart-button" type="button">Restart</button>
+        </div>
+      </section>
+
+      <section class="learn-strip">
+        <article class="learn-card">
+          <h2>How To Read The Game</h2>
+          <p>
+            Alice wants every vertex to be colored legally. Bob wins as soon as even one
+            uncolored vertex has no color left.
+          </p>
+        </article>
+        <article class="learn-card">
+          <h2>Glossary</h2>
+          <ul>
+            <li><strong>Vertex:</strong> one point in the graph.</li>
+            <li><strong>Distance 2:</strong> up to two edges away.</li>
+            <li><strong>Dead vertex:</strong> an uncolored vertex with no allowed color left.</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="layout">
+        <div class="board-card">
+          <div class="board-header">
+            <div>
+              <h2 id="case-title">Loading…</h2>
+              <p id="case-summary"></p>
+            </div>
+            <div class="chip-row">
+              <span class="chip" id="progress-chip"></span>
+            </div>
+          </div>
+          <svg id="graph-board" viewBox="0 0 520 340" aria-label="Game graph"></svg>
+          <div class="palette">
+            <p>Pick a color for the selected vertex:</p>
+            <div id="color-buttons" class="color-buttons"></div>
+          </div>
+        </div>
+
+        <aside class="info-card">
+          <div class="status-box">
+            <h3>Status</h3>
+            <p id="turn-label"></p>
+            <p id="state-label"></p>
+          </div>
+
+          <div class="status-box">
+            <h3>Next Suggestion</h3>
+            <p id="selection-label">Select a vertex to see allowed colors.</p>
+            <p id="message-label"></p>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
