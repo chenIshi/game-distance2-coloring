@@ -32,10 +32,17 @@ class Preset:
 
 
 def path_positions(size: int) -> list[dict[str, float]]:
-    spacing = 90
+    if size <= 0:
+        return []
+
     start_x = 80
+    end_x = 440
     y = 150
-    return [{"x": start_x + spacing * index, "y": y} for index in range(size)]
+    if size == 1:
+        return [{"x": (start_x + end_x) / 2, "y": y}]
+
+    spacing = (end_x - start_x) / (size - 1)
+    return [{"x": round(start_x + spacing * index, 2), "y": y} for index in range(size)]
 
 
 def cycle_positions(size: int) -> list[dict[str, float]]:
