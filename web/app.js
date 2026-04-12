@@ -14,6 +14,7 @@ const state = {
   message: "",
   progress: {},
   openDrawerId: null,
+  solvers: new Map(),
 };
 
 const roleAliceButton = document.querySelector("#role-alice");
@@ -52,9 +53,158 @@ function getCurrentCase() {
   return state.caseMap.get(state.currentCaseId);
 }
 
+function getSolver(caseId) {
+  if (state.solvers.has(caseId)) {
+    return state.solvers.get(caseId);
+  }
+
+  const gameCase = state.caseMap.get(caseId);
+  const squareGraph = gameCase.squareGraph.map((neighbors) => [...neighbors]);
+  const colorCount = gameCase.k;
+  const memo = new Map();
+
+  function legalColors(colors, vertex) {
+    if (colors[vertex] !== 0) {
+      return [];
+    }
+
+    const blocked = new Set();
+    for (const neighbor of squareGraph[vertex]) {
+      if (colors[neighbor] !== 0) {
+        blocked.add(colors[neighbor]);
+      }
+    }
+
+    const options = [];
+    for (let color = 1; color <= colorCount; color += 1) {
+      if (!blocked.has(color)) {
+        options.push(color);
+      }
+    }
+    return options;
+  }
+
+  function deadVertices(colors) {
+    const blockedVertices = [];
+    for (let vertex = 0; vertex < colors.length; vertex += 1) {
+      if (colors[vertex] === 0 && legalColors(colors, vertex).length === 0) {
+        blockedVertices.push(vertex);
+      }
+    }
+    return blockedVertices;
+  }
+
+  function orderedMoves(colors) {
+    const moves = [];
+    for (let vertex = 0; vertex < colors.length; vertex += 1) {
+      if (colors[vertex] !== 0) {
+        continue;
+      }
+      const options = legalColors(colors, vertex);
+      if (options.length > 0) {
+        moves.push({ vertex, options });
+      }
+    }
+    moves.sort((left, right) => left.options.length - right.options.length || left.vertex - right.vertex);
+    return moves;
+  }
+
+  function solve(colors, aliceTurn) {
+    const key = `${colors.join(".")}|${aliceTurn ? "A" : "B"}`;
+    if (memo.has(key)) {
+      return memo.get(key);
+    }
+
+    if (colors.every((color) => color !== 0)) {
+      memo.set(key, true);
+      return true;
+    }
+
+    if (deadVertices(colors).length > 0) {
+      memo.set(key, false);
+      return false;
+    }
+
+    const moves = orderedMoves(colors);
+    let result;
+
+    if (aliceTurn) {
+      result = false;
+      outerAlice: for (const move of moves) {
+        for (const color of move.options) {
+          const nextColors = [...colors];
+          nextColors[move.vertex] = color;
+          if (solve(nextColors, false)) {
+            result = true;
+            break outerAlice;
+          }
+        }
+      }
+    } else {
+      result = true;
+      outerBob: for (const move of moves) {
+        for (const color of move.options) {
+          const nextColors = [...colors];
+          nextColors[move.vertex] = color;
+          if (!solve(nextColors, true)) {
+            result = false;
+            break outerBob;
+          }
+        }
+      }
+    }
+
+    memo.set(key, result);
+    return result;
+  }
+
+  function analyze(colors, currentPlayer) {
+    const finished = colors.every((color) => color !== 0);
+    const blocked = deadVertices(colors);
+    const currentIsAlice = currentPlayer === "Alice";
+    const legalMoveItems = [];
+
+    if (!finished && blocked.length === 0) {
+      for (const move of orderedMoves(colors)) {
+        for (const color of move.options) {
+          legalMoveItems.push({
+            vertex: move.vertex,
+            color,
+          });
+        }
+      }
+    }
+
+    const aliceWins = solve(colors, currentIsAlice);
+    const optimalMoves = [];
+    for (const move of legalMoveItems) {
+      const nextColors = [...colors];
+      nextColors[move.vertex] = move.color;
+      const nextAliceWins = solve(nextColors, !currentIsAlice);
+      if (currentIsAlice && nextAliceWins) {
+        optimalMoves.push(move);
+      }
+      if (!currentIsAlice && !nextAliceWins) {
+        optimalMoves.push(move);
+      }
+    }
+
+    return {
+      finished,
+      deadVertices: blocked,
+      aliceWins,
+      legalMoves: legalMoveItems,
+      optimalMoves,
+    };
+  }
+
+  const solver = { analyze };
+  state.solvers.set(caseId, solver);
+  return solver;
+}
+
 function getCurrentStateData() {
-  const currentCase = getCurrentCase();
-  return currentCase.states[encodeState(state.colors, state.currentPlayer)];
+  return getSolver(state.currentCaseId).analyze(state.colors, state.currentPlayer);
 }
 
 function isGameOver() {
@@ -86,7 +236,7 @@ function saveProgress() {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state.progress));
   } catch {
-    state.progress = state.progress;
+    // Ignore storage failures.
   }
 }
 
@@ -494,7 +644,9 @@ function selectVertex(vertex) {
     if (suggestedMove) {
       setMessage(`Good choice. Try color ${suggestedMove.color} on Vertex ${vertex + 1}.`);
     } else {
-      setMessage(`Vertex ${vertex + 1} can use color${availableMoves.length > 1 ? "s" : ""} ${availableMoves.map((move) => move.color).join(", ")}.`);
+      setMessage(
+        `Vertex ${vertex + 1} can use color${availableMoves.length > 1 ? "s" : ""} ${availableMoves.map((move) => move.color).join(", ")}.`
+      );
     }
   }
   render();
@@ -523,7 +675,7 @@ function makeHumanMove(vertex, color) {
 
   const nextState = getCurrentStateData();
   if (!nextState.finished && nextState.deadVertices.length === 0 && state.currentPlayer !== state.humanRole) {
-    window.setTimeout(playComputerTurn, 420);
+    window.setTimeout(playComputerTurn, 180);
   }
 }
 
@@ -576,5 +728,9 @@ async function init() {
 
 init().catch((error) => {
   titleLabel.textContent = "Failed to load";
+  progressChip.className = "chip is-danger";
+  progressChip.textContent = "Load error";
+  turnLabel.textContent = "The app could not start.";
+  stateLabel.textContent = String(error);
   setMessage(String(error));
 });

@@ -11,7 +11,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from game_coloring.graphs import Graph, build_square_graph, make_cycle_graph, make_path_graph
-from game_coloring.solver import build_solver, dead_vertices, legal_colors
+from game_coloring.solver import build_solver
 
 
 PLAYER_ALICE = "Alice"
@@ -176,25 +176,22 @@ def make_presets() -> list[Preset]:
             challenge=True,
             graph=make_cycle_graph(7),
         ),
+        Preset(
+            case_id="cycle-c8-k5",
+            title="Cycle C8 with 5 colors",
+            family="cycle",
+            size=8,
+            color_count=5,
+            difficulty="challenge",
+            summary="Optional challenge: a larger even cycle with more room to plan.",
+            challenge=True,
+            graph=make_cycle_graph(8),
+        ),
     ]
-
-
-def encode_state(colors: tuple[int, ...], current_player: str) -> str:
-    return f'{".".join(str(color) for color in colors)}|{current_player[0]}'
 
 
 def serialize_graph(graph: Graph) -> list[list[int]]:
     return [sorted(neighbors) for neighbors in graph]
-
-
-def describe_move(move: dict[str, int | str], colors: tuple[int, ...], square_graph: Graph) -> str:
-    conflict_vertices = [
-        neighbor for neighbor in square_graph[move["vertex"]] if colors[neighbor] == move["color"]
-    ]
-    if conflict_vertices:
-        first_conflict = conflict_vertices[0]
-        return f"Not allowed: v{first_conflict} already uses color {move['color']} within 2 steps."
-    return f"Allowed: color {move['color']} is free for v{move['vertex']}."
 
 
 def export_case(preset: Preset) -> dict[str, object]:
@@ -202,67 +199,6 @@ def export_case(preset: Preset) -> dict[str, object]:
     solve = build_solver(square_graph, preset.color_count)
     start_colors = (0,) * preset.size
     positions = path_positions(preset.size) if preset.family == "path" else cycle_positions(preset.size)
-
-    pending: list[tuple[tuple[int, ...], str]] = [(start_colors, PLAYER_ALICE)]
-    seen: set[str] = set()
-    states: dict[str, object] = {}
-
-    while pending:
-        colors, current_player = pending.pop()
-        key = encode_state(colors, current_player)
-        if key in seen:
-            continue
-        seen.add(key)
-
-        blocked = list(dead_vertices(square_graph, colors, preset.color_count))
-        finished = all(color != 0 for color in colors)
-        legal_move_items: list[dict[str, int | str]] = []
-
-        if not finished and not blocked:
-            for vertex in range(len(colors)):
-                for color in legal_colors(square_graph, colors, vertex, preset.color_count):
-                    next_colors = list(colors)
-                    next_colors[vertex] = color
-                    next_tuple = tuple(next_colors)
-                    next_player = PLAYER_BOB if current_player == PLAYER_ALICE else PLAYER_ALICE
-                    legal_move_items.append(
-                        {
-                            "vertex": vertex,
-                            "color": color,
-                            "nextState": encode_state(next_tuple, next_player),
-                        }
-                    )
-                    pending.append((next_tuple, next_player))
-
-        alice_wins_here = solve(colors, current_player == PLAYER_ALICE)
-        optimal_moves: list[dict[str, int | str]] = []
-
-        for move in legal_move_items:
-            next_key = move["nextState"]
-            next_colors_text, next_turn = next_key.split("|")
-            next_colors = tuple(int(part) for part in next_colors_text.split("."))
-            next_is_alice_turn = next_turn == "A"
-            next_result = solve(next_colors, next_is_alice_turn)
-            if current_player == PLAYER_ALICE and next_result:
-                optimal_moves.append(move)
-            if current_player == PLAYER_BOB and not next_result:
-                optimal_moves.append(move)
-
-        states[key] = {
-            "colors": list(colors),
-            "currentPlayer": current_player,
-            "aliceWins": alice_wins_here,
-            "finished": finished,
-            "deadVertices": blocked,
-            "legalMoves": [
-                {
-                    **move,
-                    "explanation": describe_move(move, colors, square_graph),
-                }
-                for move in legal_move_items
-            ],
-            "optimalMoves": [{"vertex": move["vertex"], "color": move["color"]} for move in optimal_moves],
-        }
 
     return {
         "id": preset.case_id,
@@ -277,7 +213,6 @@ def export_case(preset: Preset) -> dict[str, object]:
         "squareGraph": serialize_graph(square_graph),
         "positions": positions,
         "initialWinner": PLAYER_ALICE if solve(start_colors, True) else PLAYER_BOB,
-        "states": states,
     }
 
 
