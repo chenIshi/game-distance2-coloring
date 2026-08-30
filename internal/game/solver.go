@@ -51,9 +51,16 @@ type Solver struct {
 	packedMemo    map[uint64]bool
 	stringMemo    map[string]bool
 
-	// canonical can be turned off to get the plain search back. Only tests do
-	// that, to check the optimisation against the thing it replaced.
-	canonical bool
+	// These can be turned off to get the plain search back. Only tests do
+	// that, to check each optimisation against the thing it replaced.
+	canonical   bool
+	useSymmetry bool
+
+	// symmetries of the reach graph, computed once. Empty when the graph
+	// declares none, in which case symmetry folding is skipped entirely.
+	symmetries []graph.Permutation
+	image      []int
+	best       []int
 
 	// relabel is scratch for canonicalColors. Safe to share across the
 	// recursion because it is only live inside that call, which always
@@ -63,12 +70,12 @@ type Solver struct {
 
 // NewSolver builds a solver over an already-powered graph.
 func NewSolver(reach graph.Graph, colorCount int) *Solver {
-	return newSolver(reach, colorCount, true)
+	return newSolver(reach, colorCount, true, true)
 }
 
 // newSolver builds a solver with colour canonicalisation optionally disabled,
 // which exists so tests can compare the optimised search against the plain one.
-func newSolver(reach graph.Graph, colorCount int, canonical bool) *Solver {
+func newSolver(reach graph.Graph, colorCount int, canonical, useSymmetry bool) *Solver {
 	// Colours run 0 (uncoloured) to colorCount, so the widest value is
 	// colorCount itself.
 	width := uint(bits.Len(uint(colorCount)))
@@ -82,6 +89,15 @@ func newSolver(reach graph.Graph, colorCount int, canonical bool) *Solver {
 		bitsPerVertex: width,
 		packable:      width*uint(reach.Order())+1 <= 64,
 		canonical:     canonical,
+		useSymmetry:   useSymmetry,
+	}
+
+	if useSymmetry {
+		if group := reach.Symmetries(); len(group) > 1 {
+			solver.symmetries = group
+			solver.image = make([]int, reach.Order())
+			solver.best = make([]int, reach.Order())
+		}
 	}
 	if solver.packable {
 		solver.packedMemo = map[uint64]bool{}
@@ -104,6 +120,49 @@ func newSolver(reach graph.Graph, colorCount int, canonical bool) *Solver {
 // This is where the real reduction comes from. A position using all k colours
 // stands for k! differently-named positions, and without this the search
 // explores every one of them.
+// canonicalPosition folds a position onto one representative of everything
+// equivalent to it, under both colour renaming and the graph's own symmetries.
+//
+// A symmetry of the graph maps a position onto one that plays out identically,
+// so a cycle position and the same position rotated a notch are the same
+// puzzle. Taking the smallest image over every symmetry, after colour
+// canonicalisation, picks one name for the whole class.
+//
+// Safe to reuse the scratch buffers across the recursion: they are only live
+// inside this call, which always finishes before any recursive Solve begins.
+func (s *Solver) canonicalPosition(colors []int) {
+	if !s.canonical {
+		return
+	}
+	if len(s.symmetries) == 0 {
+		s.canonicalColors(colors)
+		return
+	}
+
+	found := false
+	for _, permutation := range s.symmetries {
+		for vertex, color := range colors {
+			s.image[permutation[vertex]] = color
+		}
+		s.canonicalColors(s.image)
+		if !found || lessColors(s.image, s.best) {
+			copy(s.best, s.image)
+			found = true
+		}
+	}
+	copy(colors, s.best)
+}
+
+// lessColors compares two positions in plain lexicographic order.
+func lessColors(left, right []int) bool {
+	for i := range left {
+		if left[i] != right[i] {
+			return left[i] < right[i]
+		}
+	}
+	return false
+}
+
 func (s *Solver) canonicalColors(colors []int) {
 	for i := range s.relabel {
 		s.relabel[i] = 0
@@ -260,9 +319,7 @@ func (s *Solver) solveUncached(colors []int, aliceTurn bool) bool {
 		for _, color := range move.Options {
 			copy(next, colors)
 			next[move.Vertex] = color
-			if s.canonical {
-				s.canonicalColors(next)
-			}
+			s.canonicalPosition(next)
 			if s.Solve(next, !aliceTurn) == aliceTurn {
 				// Alice found a winning move, or Bob found a losing one.
 				return aliceTurn
