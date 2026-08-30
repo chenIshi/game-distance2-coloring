@@ -15,6 +15,7 @@ package game
 import (
 	"errors"
 	"fmt"
+	"math/bits"
 	"sort"
 
 	"github.com/chenIshi/game-distance2-coloring/internal/graph"
@@ -35,19 +36,60 @@ type Move struct {
 
 // Solver answers "does Alice win from here?" for one (reach graph, colour
 // count) pair. The memo is only valid for that pair, so build one per pair.
+//
+// Positions are memoised under an integer key whenever the whole position fits
+// in a uint64: the colour of each vertex packed into just enough bits, plus one
+// bit for whose turn it is. That avoids allocating a key on every lookup, which
+// dominates the runtime of an otherwise identical search. Larger cases fall
+// back to a byte-string key, which allocates but has no size limit.
 type Solver struct {
 	reach      graph.Graph
 	colorCount int
-	memo       map[string]bool
+
+	bitsPerVertex uint
+	packable      bool
+	packedMemo    map[uint64]bool
+	stringMemo    map[string]bool
 }
 
 // NewSolver builds a solver over an already-powered graph.
 func NewSolver(reach graph.Graph, colorCount int) *Solver {
-	return &Solver{reach: reach, colorCount: colorCount, memo: map[string]bool{}}
+	// Colours run 0 (uncoloured) to colorCount, so the widest value is
+	// colorCount itself.
+	width := uint(bits.Len(uint(colorCount)))
+	if width == 0 {
+		width = 1
+	}
+
+	solver := &Solver{
+		reach:         reach,
+		colorCount:    colorCount,
+		bitsPerVertex: width,
+		packable:      width*uint(reach.Order())+1 <= 64,
+	}
+	if solver.packable {
+		solver.packedMemo = map[uint64]bool{}
+	} else {
+		solver.stringMemo = map[string]bool{}
+	}
+	return solver
 }
 
-// key encodes a position. Colours fit in a byte; the final byte is the turn.
-func (s *Solver) key(colors []int, aliceTurn bool) string {
+// packKey encodes a position into a single integer. Only valid when packable.
+func (s *Solver) packKey(colors []int, aliceTurn bool) uint64 {
+	var key uint64
+	for _, color := range colors {
+		key = key<<s.bitsPerVertex | uint64(color)
+	}
+	key <<= 1
+	if aliceTurn {
+		key |= 1
+	}
+	return key
+}
+
+// stringKey is the unbounded fallback: one byte per vertex, plus the turn.
+func (s *Solver) stringKey(colors []int, aliceTurn bool) string {
 	encoded := make([]byte, len(colors)+1)
 	for vertex, color := range colors {
 		encoded[vertex] = byte(color)
@@ -131,13 +173,22 @@ func (s *Solver) orderedMoves(colors []int) []Move {
 // Alice needs one door; Bob needs to close every door. She wins if any of her
 // moves leads to a win; he wins if any of his leads to a loss for her.
 func (s *Solver) Solve(colors []int, aliceTurn bool) bool {
-	cacheKey := s.key(colors, aliceTurn)
-	if cached, ok := s.memo[cacheKey]; ok {
-		return cached
+	if s.packable {
+		key := s.packKey(colors, aliceTurn)
+		if cached, ok := s.packedMemo[key]; ok {
+			return cached
+		}
+		result := s.solveUncached(colors, aliceTurn)
+		s.packedMemo[key] = result
+		return result
 	}
 
+	key := s.stringKey(colors, aliceTurn)
+	if cached, ok := s.stringMemo[key]; ok {
+		return cached
+	}
 	result := s.solveUncached(colors, aliceTurn)
-	s.memo[cacheKey] = result
+	s.stringMemo[key] = result
 	return result
 }
 
@@ -173,7 +224,12 @@ func (s *Solver) solveUncached(colors []int, aliceTurn bool) bool {
 
 // Positions is the number of distinct positions the memo holds. Useful for
 // comparing search cost.
-func (s *Solver) Positions() int { return len(s.memo) }
+func (s *Solver) Positions() int {
+	if s.packable {
+		return len(s.packedMemo)
+	}
+	return len(s.stringMemo)
+}
 
 // AliceWins reports whether Alice wins the distance-d game on g with the given
 // number of colours.
