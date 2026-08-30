@@ -50,7 +50,18 @@ func run() error {
 	size := flag.Int("n", 0, "size: vertices for path/cycle, rim or leaf count otherwise")
 	distance := flag.Int("d", 2, "colouring distance")
 	colorCount := flag.Int("k", 0, "test one colour count instead of finding the least")
+	sweep := flag.Bool("sweep", false, "emit a JSON grid over every family instead of one case")
+	maxOrder := flag.Int("max-order", 8, "sweep only: largest graph to include, in vertices")
+	distances := flag.String("distances", "1,2,3", "sweep only: comma-separated distances")
 	flag.Parse()
+
+	if *sweep {
+		wanted, err := parseDistances(*distances)
+		if err != nil {
+			return err
+		}
+		return runSweep(os.Stdout, *maxOrder, wanted)
+	}
 
 	chosen, ok := families[*name]
 	if !ok {
