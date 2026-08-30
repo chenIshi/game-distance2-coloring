@@ -102,6 +102,13 @@ go test ./...                 # ~16s, includes the expensive grid
 go run ./cmd/gamecolor -family helm -n 4 -d 3
 go run ./cmd/gamecolor -family cycle -n 7 -k 4
 
+# The research artifact: a JSON grid over every family, parallel across cells
+go run ./cmd/gamecolor -sweep -max-order 12 -distances 1,2,3 > grid.json
+
+# Grade Go against the Python reference (exits non-zero on any disagreement)
+python3 scripts/conformance.py --max-order 8
+python3 scripts/conformance.py grid.json
+
 # Regenerate the (gitignored) web demo data, then serve the repo statically
 python3 scripts/export_web_cases.py
 python3 -m http.server 8000   # then open http://localhost:8000/web/
@@ -190,12 +197,35 @@ sweeps while Python stays the reference oracle. Layout is standard Go: root
 (family, n, d) combinations match with zero mismatches. Any divergence is a bug
 in the port, not a new result.
 
-**Measured speedup over Python is about 3x**, not the order of magnitude that
-switching language might suggest. The bottleneck is memo bookkeeping — string
-keys, hashing, allocation — and CPython's dict-of-tuples is already good at
-that. This is the floor for an unoptimized port, and it confirms that the real
-gains have to come from doing less work (packed state, colour canonicalization,
-symmetry collapsing) rather than from the language.
+**The language was never the win.** The unoptimized port ran about 3x faster
+than Python; the real gains came from searching fewer positions:
+
+| Change | H_5 at d=2 | Note |
+|---|---|---|
+| Python reference | 10.0 s | |
+| naive Go port | 3.4 s | ~3x, all of it constant factor |
+| packed integer memo key | 1.40 s | positions unchanged; bookkeeping only |
+| colour canonicalization | 26.7 ms | 511,269 positions → 5,493 |
+| symmetry folding | 8.2 ms | 5,493 → 630 |
+
+`helm_5` at d=1 went from **29 minutes** in Python to **0.079 s**. Cases that
+were previously unreachable now finish: `H_7`, `S_8`, `C_14`, `W_16`.
+
+Paths gain almost nothing from symmetry folding — a path has exactly two
+symmetries, so the cost nearly cancels the saving. The rim families have 2n.
+
+**Do not port these optimizations back to Python.** The reference is valuable
+precisely because it is naive: an oracle that shared a trick could not detect a
+flaw in that trick. Conformance being bounded by Python's speed is the intended
+trade, not a defect. Optimizations are additionally graded inside Go by
+`canonical_test.go`, which runs plain / colours-only / colours+symmetry side by
+side and compares every verdict.
+
+**Parallelism is across sweep cells, never across k within a cell** — running a
+cell's colour counts concurrently would compute the expensive above-threshold
+solves the upward scan deliberately never reaches, the same trap as binary
+searching k. Sweep output is written by index so it stays byte-identical
+regardless of scheduling, since the conformance harness diffs it.
 
 ### Tests
 
@@ -209,6 +239,16 @@ symmetry collapsing) rather than from the language.
 | `test_web_export.py` | export script runs and produces the expected case IDs |
 | `test_monotonicity.py` | measured properties of `chi_g,d` in k and in d, and why the scan runs upward |
 | `support.py` | the `@slow` marker (not collected by discovery) |
+
+Go-side: `internal/graph/{graph,symmetry}_test.go` mirror the Python structural
+and symmetry tests; `internal/game/solver_test.go` pins the same known values;
+`internal/game/canonical_test.go` is the differential check on the
+optimizations; `internal/game/bench_test.go` holds the benchmark cases and
+`TestPositionCount`, which reports the number that actually matters when
+optimizing.
+
+CI (`.github/workflows/ci.yml`) runs the Python suite, Go fmt/vet/test, the
+conformance harness, and `verify_properties.py` on every push.
 
 Every value asserted in `test_solver.py` was cross-checked against a separately written
 brute-force solver before being written down — the point is that this suite is the
