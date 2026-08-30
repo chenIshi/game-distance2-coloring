@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/chenIshi/game-distance2-coloring/internal/game"
 	"github.com/chenIshi/game-distance2-coloring/internal/graph"
@@ -82,10 +84,28 @@ func parseDistances(spec string) ([]int, error) {
 	return distances, nil
 }
 
-// runSweep emits every case whose graph fits within maxOrder vertices.
-func runSweep(out io.Writer, maxOrder int, distances []int) error {
-	result := sweepOutput{Cases: []Case{}}
+// work is one cell of the sweep, before it has been solved.
+type work struct {
+	family   string
+	n        int
+	distance int
+	graph    graph.Graph
+}
 
+// runSweep emits every case whose graph fits within maxOrder vertices.
+//
+// Cells are solved in parallel because they are completely independent: each
+// builds its own graph and its own memo, and nothing is shared. Note that the
+// parallelism is across cells, NOT across colour counts within one cell. The
+// k-scan stops at the threshold on purpose, so running its k values
+// concurrently would spend cores computing the expensive above-threshold solves
+// that the sequential scan never reaches -- the same trap as binary searching k.
+//
+// Results are written by index rather than appended, so the output is identical
+// regardless of scheduling. The conformance harness diffs this, so a
+// non-deterministic ordering would be worse than useless.
+func runSweep(out io.Writer, maxOrder int, distances []int, workers int) error {
+	var cells []work
 	for _, family := range sweepFamilies {
 		for n := family.from; ; n++ {
 			g, err := family.build(n)
@@ -96,18 +116,48 @@ func runSweep(out io.Writer, maxOrder int, distances []int) error {
 				break
 			}
 			for _, distance := range distances {
-				built, err := buildCase(family.name, n, distance, g)
-				if err != nil {
-					return err
-				}
-				result.Cases = append(result.Cases, built)
+				cells = append(cells, work{family.name, n, distance, g})
 			}
+		}
+	}
+
+	if workers < 1 {
+		workers = runtime.GOMAXPROCS(0)
+	}
+	if workers > len(cells) {
+		workers = len(cells)
+	}
+
+	solved := make([]Case, len(cells))
+	failures := make([]error, len(cells))
+	queue := make(chan int)
+
+	var group sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			for index := range queue {
+				cell := cells[index]
+				solved[index], failures[index] = buildCase(cell.family, cell.n, cell.distance, cell.graph)
+			}
+		}()
+	}
+	for index := range cells {
+		queue <- index
+	}
+	close(queue)
+	group.Wait()
+
+	for _, err := range failures {
+		if err != nil {
+			return err
 		}
 	}
 
 	encoder := json.NewEncoder(out)
 	encoder.SetIndent("", " ")
-	return encoder.Encode(result)
+	return encoder.Encode(sweepOutput{Cases: solved})
 }
 
 func buildCase(family string, n, distance int, g graph.Graph) (Case, error) {
