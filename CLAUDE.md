@@ -95,6 +95,13 @@ GAME_COLORING_SLOW=1 python3 -m unittest discover -s tests
 # A single test case
 python3 -m unittest tests.test_paths.PathGraphTests.test_small_known_values
 
+# Go (requires go on PATH; this machine has it at ~/.local/go/bin)
+go build ./... && go vet ./... && gofmt -l .
+go test -short ./...          # ~2s
+go test ./...                 # ~16s, includes the expensive grid
+go run ./cmd/gamecolor -family helm -n 4 -d 3
+go run ./cmd/gamecolor -family cycle -n 7 -k 4
+
 # Regenerate the (gitignored) web demo data, then serve the repo statically
 python3 scripts/export_web_cases.py
 python3 -m http.server 8000   # then open http://localhost:8000/web/
@@ -161,6 +168,34 @@ helpers, not in the JS.
 case IDs and `initialWinner` values. **Adding, renaming, or removing a preset in
 `make_presets()` requires updating that test**, which doubles as the regression check on
 solver results for the tree and cycle families.
+
+### Go implementation
+
+A port of the Python solver, intended to become the tool actually used for
+sweeps while Python stays the reference oracle. Layout is standard Go: root
+`go.mod`, `cmd/gamecolor` for the CLI, `internal/graph` and `internal/game`.
+
+- `internal/graph` — `Graph` carries `Neighbors` **and** `Generators`, the
+  symmetry generators its builder declared. That slot is the whole reason the
+  package exists in this shape: the builder knows the recipe, and discovering
+  symmetries from a bare adjacency list is a hard general problem. `Power`
+  carries the generators through unchanged, since relabelling cannot change
+  distances. `symmetry.go` mirrors the Python module, `IsSymmetry` included.
+- `internal/game` — a direct port of `solver.py`, deliberately with no
+  cleverness yet: `map[string]bool` memo, one byte per vertex plus a turn byte.
+  Move ordering is kept identical to Python's so the two explore in the same
+  order.
+
+**The Go port must agree with Python exactly.** As of the initial port, 84
+(family, n, d) combinations match with zero mismatches. Any divergence is a bug
+in the port, not a new result.
+
+**Measured speedup over Python is about 3x**, not the order of magnitude that
+switching language might suggest. The bottleneck is memo bookkeeping — string
+keys, hashing, allocation — and CPython's dict-of-tuples is already good at
+that. This is the floor for an unoptimized port, and it confirms that the real
+gains have to come from doing less work (packed state, colour canonicalization,
+symmetry collapsing) rather than from the language.
 
 ### Tests
 
