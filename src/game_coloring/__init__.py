@@ -1,13 +1,52 @@
-from .graphs import make_cycle_graph, make_path_graph, make_star_graph
-from .solver import Analysis, Move, alice_wins, analyze_game, game_distance_2_chromatic_number
+from .graphs import (
+    build_square_graph,
+    cycle_symmetries,
+    diameter,
+    helm_symmetries,
+    is_complete,
+    make_cycle_graph,
+    make_helm_graph,
+    make_path_graph,
+    make_star_graph,
+    make_sunlet_graph,
+    make_wheel_graph,
+    path_symmetries,
+    power_graph,
+    sunlet_symmetries,
+    wheel_symmetries,
+)
+from .solver import (
+    Analysis,
+    Move,
+    alice_wins,
+    analyze_game,
+    game_chromatic_number,
+    game_distance_2_chromatic_number,
+)
+from .symmetry import close_group, is_symmetry
 
 __all__ = [
     "Analysis",
     "Move",
     "alice_wins",
     "analyze_game",
+    "build_square_graph",
+    "close_group",
+    "cycle_symmetries",
+    "diameter",
+    "game_chromatic_number",
     "game_distance_2_chromatic_number",
+    "helm_symmetries",
+    "is_complete",
+    "is_symmetry",
     "make_cycle_graph",
+    "make_helm_graph",
     "make_path_graph",
     "make_star_graph",
+    "make_sunlet_graph",
+    "make_wheel_graph",
+    "path_symmetries",
+    "power_graph",
+    "sunlet_symmetries",
+    "wheel_symmetries",
 ]
