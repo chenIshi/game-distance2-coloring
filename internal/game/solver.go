@@ -50,10 +50,25 @@ type Solver struct {
 	packable      bool
 	packedMemo    map[uint64]bool
 	stringMemo    map[string]bool
+
+	// canonical can be turned off to get the plain search back. Only tests do
+	// that, to check the optimisation against the thing it replaced.
+	canonical bool
+
+	// relabel is scratch for canonicalColors. Safe to share across the
+	// recursion because it is only live inside that call, which always
+	// finishes before any recursive Solve begins.
+	relabel []int
 }
 
 // NewSolver builds a solver over an already-powered graph.
 func NewSolver(reach graph.Graph, colorCount int) *Solver {
+	return newSolver(reach, colorCount, true)
+}
+
+// newSolver builds a solver with colour canonicalisation optionally disabled,
+// which exists so tests can compare the optimised search against the plain one.
+func newSolver(reach graph.Graph, colorCount int, canonical bool) *Solver {
 	// Colours run 0 (uncoloured) to colorCount, so the widest value is
 	// colorCount itself.
 	width := uint(bits.Len(uint(colorCount)))
@@ -66,13 +81,45 @@ func NewSolver(reach graph.Graph, colorCount int) *Solver {
 		colorCount:    colorCount,
 		bitsPerVertex: width,
 		packable:      width*uint(reach.Order())+1 <= 64,
+		canonical:     canonical,
 	}
 	if solver.packable {
 		solver.packedMemo = map[uint64]bool{}
 	} else {
 		solver.stringMemo = map[string]bool{}
 	}
+	solver.relabel = make([]int, colorCount+1)
 	return solver
+}
+
+// canonicalColors renames colours in place by order of first appearance, so
+// that 0,2,0,3 and 0,3,0,1 both become 0,1,0,2.
+//
+// Sound because the rules treat colours symmetrically: permuting the colour
+// names maps any position onto an equivalent one with the same winner. Two
+// positions that differ only by such a permutation share a first-appearance
+// order, so they canonicalise to the same thing and are searched once instead
+// of once per naming.
+//
+// This is where the real reduction comes from. A position using all k colours
+// stands for k! differently-named positions, and without this the search
+// explores every one of them.
+func (s *Solver) canonicalColors(colors []int) {
+	for i := range s.relabel {
+		s.relabel[i] = 0
+	}
+
+	next := 1
+	for vertex, color := range colors {
+		if color == 0 {
+			continue
+		}
+		if s.relabel[color] == 0 {
+			s.relabel[color] = next
+			next++
+		}
+		colors[vertex] = s.relabel[color]
+	}
 }
 
 // packKey encodes a position into a single integer. Only valid when packable.
@@ -213,6 +260,9 @@ func (s *Solver) solveUncached(colors []int, aliceTurn bool) bool {
 		for _, color := range move.Options {
 			copy(next, colors)
 			next[move.Vertex] = color
+			if s.canonical {
+				s.canonicalColors(next)
+			}
 			if s.Solve(next, !aliceTurn) == aliceTurn {
 				// Alice found a winning move, or Bob found a losing one.
 				return aliceTurn
@@ -254,6 +304,7 @@ func AliceWins(g graph.Graph, colorCount, distance int) (bool, error) {
 		return colorCount >= reach.Order(), nil
 	}
 
+	// The all-uncoloured start position is already canonical.
 	return NewSolver(reach, colorCount).Solve(make([]int, reach.Order()), true), nil
 }
 
