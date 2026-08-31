@@ -104,6 +104,7 @@ go test -short ./...          # ~2s
 go test ./...                 # ~16s, includes the expensive grid
 go run ./cmd/gamecolor -family helm -n 4 -d 3
 go run ./cmd/gamecolor -family cycle -n 7 -k 4
+go run ./cmd/gamecolor -family helm -n 4 -k 3 -d 1 -explain
 
 # The research artifact: every family, size, and distance, parallel across cells
 go run ./cmd/gamecolor -sweep -max-order 12 -distances 1,2,3 -format table
@@ -193,10 +194,12 @@ sweeps while Python stays the reference oracle. Layout is standard Go: root
   symmetries from a bare adjacency list is a hard general problem. `Power`
   carries the generators through unchanged, since relabelling cannot change
   distances. `symmetry.go` mirrors the Python module, `IsSymmetry` included.
-- `internal/game` — a direct port of `solver.py`, deliberately with no
-  cleverness yet: `map[string]bool` memo, one byte per vertex plus a turn byte.
-  Move ordering is kept identical to Python's so the two explore in the same
-  order.
+- `internal/game` — the solver, plus `explain.go`, which replays one concrete
+  line of play. Explaining a result is kept separate from computing it: `Analyze`
+  mirrors Python's `analyze_game` move for move (verified over 87 cases), and the
+  CLI names vertices by role (`hub`, `rim4`, `stub4`) rather than by index, which
+  is what makes a reported kill readable. `-explain` requires `-k`; without a
+  colour count there is no single game to narrate.
 
 **The Go port must agree with Python exactly.** As of the initial port, 84
 (family, n, d) combinations match with zero mismatches. Any divergence is a bug

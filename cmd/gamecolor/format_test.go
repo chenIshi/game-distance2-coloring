@@ -76,3 +76,26 @@ func TestUnknownFormatIsRejected(t *testing.T) {
 		t.Fatal("expected an error for an unknown format")
 	}
 }
+
+func TestVertexNamesFollowTheNumberingContract(t *testing.T) {
+	// The names encode CLAUDE.md's numbering, so a drift here is a drift from
+	// the builders and the declared symmetries.
+	helm := vertexNamer("helm", 4)
+	for vertex, want := range map[int]string{0: "hub", 1: "rim1", 4: "rim4", 5: "stub1", 8: "stub4"} {
+		if got := helm(vertex); got != want {
+			t.Errorf("helm vertex %d named %q, want %q", vertex, got, want)
+		}
+	}
+	sunlet := vertexNamer("sunlet", 4)
+	for vertex, want := range map[int]string{0: "rim0", 3: "rim3", 4: "stub0", 7: "stub3"} {
+		if got := sunlet(vertex); got != want {
+			t.Errorf("sunlet vertex %d named %q, want %q", vertex, got, want)
+		}
+	}
+	if got := vertexNamer("wheel", 5)(0); got != "hub" {
+		t.Errorf("wheel vertex 0 named %q, want hub", got)
+	}
+	if got := vertexNamer("path", 5)(2); got != "v2" {
+		t.Errorf("path vertex 2 named %q, want v2", got)
+	}
+}

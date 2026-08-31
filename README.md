@@ -43,12 +43,39 @@ larger counts, which are far more expensive (see *Why the scan counts upward*).
 | `-n` | size | vertices for path/cycle, **rim count** otherwise |
 | `-d` | colouring distance | default `2` |
 | `-k` | test one colour count instead of finding the least | optional |
+| `-explain` | with `-k`, replay one concrete line of play | optional |
 
 ```bash
 ./gamecolor -family sunlet -n 5 -d 3      # S_5: chi_g,3 = 8
 ./gamecolor -family helm -n 4 -k 5        # H_4 with k=5 at d=2: Alice
 ./gamecolor -family helm -n 4 -k 4        # H_4 with k=4 at d=2: Bob
 ```
+
+### Seeing a game played out
+
+`-explain` replays one line and, when Bob wins, says exactly why the trapped vertex is
+trapped. Vertices are named by their role, so the reason reads directly:
+
+```
+$ ./gamecolor -family helm -n 4 -k 3 -d 1 -explain
+H_4 with k=3 at d=1: Bob
+
+one line of play:
+  Alice: hub   -> 1
+  Bob:   rim1  -> 2
+  Alice: rim2  -> 3
+  Bob:   stub1 -> 1
+  Alice: rim3  -> 2
+  Bob:   stub4 -> 3
+dead vertex: rim4
+  blocked by hub=1, rim1=2, rim3=2, stub4=3
+  between them that is all 3 colours -- nothing left for it
+(one line of play, not a proof of the whole strategy tree)
+```
+
+`rim4`'s two rim neighbours are both colour 2 — the rim's alternating pattern was never
+broken. Bob used the pendant to supply the third colour. That single line is why a helm
+needs a colour more than the wheel it is built from.
 
 ### Families, sizes, and numbering
 
@@ -120,15 +147,6 @@ python run_cli.py path 2 --k 1 --explain
 ```
 
 Only knows path, cycle, and star, only at distance 2, and is thousands of times slower.
-It has one thing Go does not — `--explain` replays a sample game move by move:
-
-```
-P_2 with k=1: Bob
-one failed line:
-  Alice: v0 -> color 1
-dead vertex set: v1
-```
-
 It stays naive on purpose. It is the oracle the Go implementation is graded against, and an
 oracle that shared Go's optimisations could not detect a flaw in them.
 

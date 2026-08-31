@@ -55,6 +55,7 @@ func run() error {
 	distances := flag.String("distances", "1,2,3", "sweep only: comma-separated distances")
 	workers := flag.Int("workers", 0, "sweep only: parallel workers (0 = one per core)")
 	format := flag.String("format", "json", "sweep only: json, table, or csv")
+	explain := flag.Bool("explain", false, "with -k: replay one concrete line of play")
 	flag.Parse()
 
 	if *sweep {
@@ -82,7 +83,19 @@ func run() error {
 			return err
 		}
 		fmt.Printf("%s with k=%d at d=%d: %s\n", label, *colorCount, *distance, winner(won))
+		if *explain {
+			analysis, err := game.Analyze(g, *colorCount, *distance)
+			if err != nil {
+				return err
+			}
+			fmt.Println()
+			writeExplanation(os.Stdout, analysis, vertexNamer(*name, *size), *colorCount)
+		}
 		return nil
+	}
+
+	if *explain {
+		return fmt.Errorf("-explain needs a colour count; add -k")
 	}
 
 	value, err := game.ChromaticNumber(g, *distance)
