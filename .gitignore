@@ -11,3 +11,7 @@ web/data/cases.json
 /gamecolor
 *.test
 *.out
+
+# Web build artifacts
+web/solver.wasm
+web/wasm_exec.js
