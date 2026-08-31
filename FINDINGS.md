@@ -266,7 +266,89 @@ Helms show neither effect: `chi_g,1(H_n) = 4` flat for `n = 3..6`, no wobble.
 
 ---
 
-## 7. Open questions
+## 7. Helms at `d = 1`: the pendant takes back the wheel's trick
+
+`chi_g,1(H_n) = 4` flat for `n = 3..7`. No wobble at all, where the wheel dips and the
+sunlet alternates. The flatness is not "nothing interesting happens" — it is a third
+distinct behaviour.
+
+### Three families, three different games
+
+At 3 colours, the count that decides every even rim:
+
+```
+             Alice first   Bob first
+  W_4           Alice        Bob        <- first player WINS
+  H_4            Bob         Bob        <- turn order is irrelevant
+  S_4            Bob         Alice      <- first player LOSES
+```
+
+On the wheel, moving first is an advantage and Alice cashes it in. On the sunlet it is a
+liability and she is stuck with it. On the helm **turn order does not matter at all**: Bob
+wins whoever starts. Alice is not unlucky about move order, she is simply beaten.
+
+That is why helms never wobble. Wobble comes from turn-order effects, and helms have none.
+
+### The pendant destroys the hub trick
+
+`W_4` and `W_6` get away with 3 colours by the tempo argument in section 5. Hang one pendant
+on each rim vertex and `H_4` and `H_6` need 4. The tool shows exactly why:
+
+```
+$ ./gamecolor -family helm -n 4 -k 3 -d 1 -explain
+H_4 with k=3 at d=1: Bob
+
+one line of play:
+  Alice: hub   -> 1
+  Bob:   rim1  -> 2
+  Alice: rim2  -> 3
+  Bob:   stub1 -> 1
+  Alice: rim3  -> 2
+  Bob:   stub4 -> 3
+dead vertex: rim4
+  blocked by hub=1, rim1=2, rim3=2, stub4=3
+  between them that is all 3 colours -- nothing left for it
+(one line of play, not a proof of the whole strategy tree)
+```
+
+`rim4`'s two rim neighbours are **both colour 2**. The alternating rim pattern was never
+broken — Alice defended the rim perfectly, and it did not help. Bob ignored the rim and used
+the pendant to deliver the third colour. On a bare wheel `rim4` would see only `{1, 2}` and
+colour 3 would still be free.
+
+So the hub hands Alice a trick and the pendants take it straight back. Compare with section
+6: on a sunlet the pendant is what makes a trap possible at all; on a helm it is what
+defeats the one defence the hub had provided.
+
+### At `d = 2` the game costs helms nothing
+
+```
+n   |V|  hub+rim clique  chi(H_n^2)  chi_g,2  penalty
+3     7        4              5          6      +1
+4     9        5              5          5     none
+5    11        6              6          6     none
+6    13        7              7          7     none
+7    15        8              8          8     none
+8    17        9              9          9     none
+```
+
+**From `n = 4` on, Bob is powerless.** Alice achieves the best possible colouring every time.
+
+The answer is forced by structure. At `d = 2` the hub is within two steps of everything, and
+any two rim vertices are two steps apart through it, so the hub together with the entire rim
+is a **clique of size `n+1`** in the power graph. That alone forces `n+1` colours, and Alice
+always reaches it:
+
+> `chi_g,2(H_n) = n + 1` for `n >= 4`.
+
+This also explains an apparent violation of section 3. The row `6 5 6 7 8` looks like another
+case of a larger graph needing fewer colours, but it is not a dip in the underlying trend:
+`n = 3` is the single exceptional case carrying a `+1` penalty, sitting above an otherwise
+smooth line. Everything from `n = 4` is exactly `n+1`.
+
+---
+
+## 8. Open questions
 
 - **Does the sunlet alternation continue?** Confirmed to `n = 9`. `S_10` and beyond are
   within reach of the Go solver but were not run.
@@ -277,8 +359,13 @@ Helms show neither effect: `chi_g,1(H_n) = 4` flat for `n = 3..6`, no wobble.
   argument says nothing about parity, and odd sunlets have exactly the same degree-3 rim
   vertices, yet `S_3`, `S_5`, `S_7` are fine at 3 colours while `S_4`, `S_6`, `S_8` are not.
   Unexplained.
-- **Why do helms show no wobble at all?** `chi_g,1(H_n) = 4` flat. Helms have pendants too,
-  so whatever drives the sunlet's parity split is not the pendants on their own.
+- **Why do helms show no wobble at all?** Partly answered in section 7: turn order is
+  irrelevant for helms, and wobble comes from turn-order effects. What remains open is why
+  the hub removes the sensitivity that the sunlet has, given both families carry the same
+  pendants.
+- **Is `chi_g,2(H_n) = n + 1` exact for all `n >= 4`?** Confirmed to `n = 8`, and the
+  hub-plus-rim clique gives the lower bound for free. Whether Alice always attains it is
+  measured, not proved.
 - **Do monotonicity in `k` and `d` hold in general,** or only on the sizes reachable here?
   Both are measured, neither is proved.
 
@@ -304,8 +391,16 @@ python3 scripts/verify_properties.py --max-vertices 8
 python3 scripts/conformance.py --max-order 8
 ```
 
-Turn-order probes (sections 5 and 6) use the Python reference directly, since they ask about
-a position mid-game rather than a whole graph:
+Traced games come straight from the tool:
+
+```bash
+./gamecolor -family helm -n 4 -k 3 -d 1 -explain     # section 7's kill
+./gamecolor -family sunlet -n 4 -k 3 -d 1 -explain   # section 6's kill
+./gamecolor -family wheel -n 4 -k 3 -d 1 -explain    # section 5's hub opening
+```
+
+Turn-order probes (sections 5, 6 and 7) still use the Python reference directly, because
+they ask who wins when **Bob** moves first, and the CLI always starts Alice:
 
 ```python
 import sys; sys.path.insert(0, "src")
