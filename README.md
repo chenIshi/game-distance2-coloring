@@ -92,6 +92,9 @@ search needed. `.` means that size does not exist for the family, or exceeds `-m
 Three formats: `-format table` to read, `-format csv` to load into a spreadsheet, and
 `-format json` (the default) which carries the full detail the conformance harness diffs.
 
+Measured results, and the reasoning behind them, are collected in
+[`FINDINGS.md`](FINDINGS.md).
+
 ## Things that look like bugs and are not
 
 **A bigger graph can need fewer colours.** `C_6` needs 5 but `C_7` needs 4. This happens in
@@ -170,3 +173,4 @@ tests/              Python test suite
 ```
 
 `CLAUDE.md` carries the working conventions and the reasoning behind the design decisions.
+`FINDINGS.md` carries the measured results.

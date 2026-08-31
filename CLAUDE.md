@@ -55,6 +55,9 @@ total while the threshold k=5 costs 2%. Scanning upward stops at the threshold a
 pays for the expensive large-k solves; a binary search over `[0, |V|]` would probe above it.
 The linear scan is the right algorithm here, not a placeholder.
 
+Measured results live in `FINDINGS.md` — keep new findings there rather than growing
+this file, which is for working conventions.
+
 **Monotonicity in n definitely fails, in every family.** A larger graph can need strictly
 fewer colours. This is a real property of the problem, not a bug, and it is the single
 most common thing to mistake for one:
