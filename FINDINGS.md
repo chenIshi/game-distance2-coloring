@@ -198,7 +198,40 @@ colours does not care who moves first:
 Bare cycle with 3 colours, n = 4..9:  Alice wins whether she moves first or second.
 ```
 
-**What is actually happening.** The sunlet *as a whole* is turn-order sensitive at even `n`:
+### Why the pendant matters: it is a third neighbour
+
+The reason the bare rim is indifferent to turn order is stronger than "Alice plays well".
+With 3 colours on a bare cycle, **no vertex can ever be trapped by anyone.** Every vertex
+has exactly two neighbours, two neighbours block at most two colours, and there are three,
+so one is always left. Alice cannot lose that game even playing deliberately badly, which is
+why it looks turn-order insensitive: the outcome was never in doubt.
+
+A pendant raises each rim vertex from two neighbours to three — exactly the number of
+colours. That is the entire structural change:
+
+```
+bare cycle:  rim vertex has 2 neighbours  ->  at most 2 colours blocked  ->  can never die
+sunlet:      rim vertex has 3 neighbours  ->  all 3 colours can be blocked  ->  can die
+```
+
+One stub per vertex takes the game from *impossible to lose* to *losable*, and only then
+does being forced to move first start to cost anything. A concrete kill on `S_4` with 3
+colours:
+
+```
+  Alice: colours rim0 with 1
+  Bob  : colours rim2 with 2
+  Alice: colours rim1 with 3
+  Bob  : colours stub7 (hanging off rim3) with 3
+
+  DEAD: rim3's neighbours are rim0=1, rim2=2, stub7=3 -- all three colours, nothing left.
+```
+
+`rim3` died to its two ring neighbours plus its own stub. Strip the stub and the same
+position is harmless.
+
+**What is actually happening.** Once losing is possible, the even sunlet becomes turn-order
+sensitive and the first move is a liability:
 
 ```
 Sunlet with 3 colours:
@@ -213,6 +246,10 @@ On an even sunlet, **whoever moves first loses**. Were Bob forced to open, Alice
 The rules make Alice open, so she loses. She is not being outplayed; she is losing because
 she is compelled to move at all when every available move damages her position — zugzwang.
 The fourth colour buys enough slack that her forced opening stops being fatal.
+
+This is not a matter of Alice missing a clever opening. On `S_4` with 3 colours **every one
+of her eight possible opening moves loses**, rim and pendant alike, while on the bare `C_4`
+every opening wins. There is nothing to find.
 
 Odd sunlets have no such problem: Alice wins whoever starts, confirmed at n = 5 and 7.
 
@@ -235,8 +272,13 @@ Helms show neither effect: `chi_g,1(H_n) = 4` flat for `n = 3..6`, no wobble.
   within reach of the Go solver but were not run.
 - **Is the wheel really 4 forever?** Confirmed to `n = 18` (19 vertices). Cost roughly
   triples per extra rim vertex, so `n = 20` is about 15 minutes.
-- **Why is even-rim zugzwang specific to sunlets?** Helms have pendants too and show no
-  wobble at all. The pendants alone do not explain it.
+- **Why is even worse than odd for sunlets?** Section 6 explains why sunlets are losable at
+  all — the pendant gives each rim vertex three neighbours, matching the three colours. That
+  argument says nothing about parity, and odd sunlets have exactly the same degree-3 rim
+  vertices, yet `S_3`, `S_5`, `S_7` are fine at 3 colours while `S_4`, `S_6`, `S_8` are not.
+  Unexplained.
+- **Why do helms show no wobble at all?** `chi_g,1(H_n) = 4` flat. Helms have pendants too,
+  so whatever drives the sunlet's parity split is not the pendants on their own.
 - **Do monotonicity in `k` and `d` hold in general,** or only on the sizes reachable here?
   Both are measured, neither is proved.
 
