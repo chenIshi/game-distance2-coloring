@@ -168,16 +168,22 @@ recording what the code happens to print.
 
 ## Web demo
 
-A static teaching demo lives in `web/`:
+A playable demo lives in `web/`, running **the same Go solver** compiled to WebAssembly —
+not a reimplementation of it.
 
 ```bash
-python3 scripts/export_web_cases.py
-python3 -m http.server 8000    # then open http://localhost:8000/web/
+./scripts/build_wasm.sh          # compiles cmd/wasmsolver to web/solver.wasm
+python3 -m http.server 8000      # then open http://localhost:8000/web/
 ```
 
-It currently mirrors the Python solver in JavaScript and covers only the distance-2 tree
-and cycle presets. Replacing that with the Go solver compiled to WebAssembly is the next
-piece of work.
+It has curated levels drawn from the findings (several in pairs differing by one colour or
+one vertex), and a sandbox where you pick family, size, distance and colour count freely.
+Nothing is precomputed: the solver runs in a Web Worker in your browser, so any combination
+works. When a vertex is trapped the page names the neighbours blocking each colour, the same
+way `-explain` does.
+
+`web/solver.wasm` and `web/wasm_exec.js` are build artifacts and are gitignored; the Pages
+workflow builds them before deploying.
 
 ## Layout
 

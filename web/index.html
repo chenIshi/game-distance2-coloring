@@ -1,43 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Distance-2 Coloring Game</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Distance-d Colouring Game</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="game-shell">
-      <header class="top-hud">
-        <div class="brand-block">
-          <p class="eyebrow">Distance-2 Coloring Game</p>
-          <h1>Play the graph. Learn the trap.</h1>
-        </div>
-        <div class="hud-actions">
+    <div class="app">
+      <header class="app-bar">
+        <h1>Distance-<em>d</em> Colouring Game</h1>
+        <nav class="app-nav">
           <button id="open-levels" type="button">Levels</button>
-          <button id="open-game-panel" type="button">Game</button>
-          <button id="open-next-move" type="button">Next Move</button>
+          <button id="open-sandbox" type="button">Sandbox</button>
+          <button id="open-game-panel" type="button">Side</button>
           <button id="open-how-to" type="button">How To</button>
-        </div>
+        </nav>
       </header>
 
-      <section class="playfield">
-        <aside class="status-hud">
-          <p class="eyebrow">Status</p>
-          <div class="status-head">
+      <main class="stage">
+        <section class="case-head">
+          <div class="case-title-row">
             <h2 id="case-title">Loading…</h2>
             <span class="chip" id="progress-chip"></span>
           </div>
           <p id="case-summary" class="summary"></p>
           <p id="turn-label" class="turn-line"></p>
           <p id="state-label" class="state-line"></p>
-        </aside>
+        </section>
 
-        <section class="graph-stage">
+        <section class="board-wrap">
           <div class="board-frame">
             <svg id="graph-board" viewBox="0 0 520 340" aria-label="Game graph"></svg>
             <div id="result-overlay" class="result-overlay hidden" aria-live="polite">
-              <div class="result-card">
+              <div class="overlay-card">
                 <p class="eyebrow" id="overlay-eyebrow">Round Over</p>
                 <h3 id="overlay-title"></h3>
                 <p id="overlay-body"></p>
@@ -50,75 +46,105 @@
             </div>
           </div>
 
-          <div class="palette">
-            <p>Choose a color for the selected vertex:</p>
+          <!-- The reason a vertex died, in the same terms the CLI reports it. -->
+          <div id="explain-panel" class="explain-panel hidden" aria-live="polite"></div>
+
+          <div class="controls">
             <div id="color-buttons" class="color-buttons"></div>
           </div>
+          <p id="selection-label" class="hint-line">Pick a vertex, then pick a colour.</p>
+          <p id="message-label" class="hint-line"></p>
         </section>
-      </section>
+      </main>
 
       <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
 
       <aside id="levels-drawer" class="drawer hidden">
         <div class="drawer-head">
-          <div>
-            <p class="eyebrow">Levels</p>
-            <h2>Choose a puzzle</h2>
-          </div>
-          <button class="drawer-close" data-close-drawer="levels-drawer" type="button">Close</button>
+          <h2>Levels</h2>
+          <button class="drawer-close" type="button" aria-label="Close">×</button>
         </div>
+        <p class="drawer-copy">
+          Each level is a real position from the research. Several come in pairs that
+          differ by one colour or one vertex.
+        </p>
         <div id="level-list" class="level-list"></div>
+      </aside>
+
+      <aside id="sandbox-drawer" class="drawer hidden">
+        <div class="drawer-head">
+          <h2>Sandbox</h2>
+          <button class="drawer-close" type="button" aria-label="Close">×</button>
+        </div>
+        <p class="drawer-copy">
+          Build any graph and play it. The solver runs in your browser, so nothing is
+          precomputed and any combination works.
+        </p>
+        <label class="field">
+          <span>Family</span>
+          <select id="sandbox-family"></select>
+        </label>
+        <label class="field">
+          <span id="sandbox-size-label">Size</span>
+          <input id="sandbox-size" type="number" min="2" max="14" value="6" />
+        </label>
+        <label class="field">
+          <span>Distance <em>d</em></span>
+          <input id="sandbox-distance" type="number" min="1" max="5" value="2" />
+        </label>
+        <label class="field">
+          <span>Colours <em>k</em></span>
+          <input id="sandbox-colors" type="number" min="1" max="12" value="4" />
+        </label>
+        <p id="sandbox-info" class="drawer-copy sandbox-info"></p>
+        <div class="drawer-actions">
+          <button id="sandbox-solve" type="button">What is the answer?</button>
+          <button id="sandbox-play" type="button">Play this</button>
+        </div>
       </aside>
 
       <aside id="game-drawer" class="drawer hidden">
         <div class="drawer-head">
-          <div>
-            <p class="eyebrow">Game Panel</p>
-            <h2>Choose your side</h2>
-          </div>
-          <button class="drawer-close" data-close-drawer="game-drawer" type="button">Close</button>
+          <h2>Which side?</h2>
+          <button class="drawer-close" type="button" aria-label="Close">×</button>
         </div>
         <p class="drawer-copy">
-          Alice tries to complete every vertex. Bob tries to create one dead vertex.
+          Alice wants every vertex coloured. Bob wants one vertex left with no legal
+          colour. Alice always moves first.
         </p>
-        <div class="segmented">
+        <div class="drawer-actions">
           <button id="role-alice" type="button">Play as Alice</button>
           <button id="role-bob" type="button">Play as Bob</button>
         </div>
-      </aside>
-
-      <aside id="next-move-drawer" class="drawer hidden">
-        <div class="drawer-head">
-          <div>
-            <p class="eyebrow">Next Move</p>
-            <h2>Current suggestion</h2>
-          </div>
-          <button class="drawer-close" data-close-drawer="next-move-drawer" type="button">Close</button>
+        <div class="drawer-actions">
+          <button id="restart-button" type="button">Restart</button>
         </div>
-        <p id="selection-label" class="drawer-copy">Select a vertex to see which colors are allowed.</p>
-        <p id="message-label" class="drawer-copy"></p>
       </aside>
 
       <aside id="how-to-drawer" class="drawer hidden">
         <div class="drawer-head">
-          <div>
-            <p class="eyebrow">How To Play</p>
-            <h2>Quick rules</h2>
-          </div>
-          <button class="drawer-close" data-close-drawer="how-to-drawer" type="button">Close</button>
+          <h2>How to play</h2>
+          <button class="drawer-close" type="button" aria-label="Close">×</button>
         </div>
-        <ul class="rules-list">
-          <li><strong>Alice:</strong> finish coloring every vertex.</li>
-          <li><strong>Bob:</strong> trap one uncolored vertex so no legal color remains.</li>
-          <li><strong>Distance 2:</strong> the same color cannot repeat within two edges.</li>
-          <li><strong>A / B badge:</strong> shows who colored that vertex.</li>
-        </ul>
+        <p class="drawer-copy">
+          Two players take turns. On your turn, pick an uncoloured vertex and give it a
+          colour that no vertex within distance <em>d</em> is already using.
+        </p>
+        <p class="drawer-copy">
+          <strong>Alice</strong> wins if every vertex ends up coloured.
+          <strong>Bob</strong> wins the moment some uncoloured vertex has no legal
+          colour left. Alice moves first.
+        </p>
+        <p class="drawer-copy">
+          At <em>d</em> = 1 only touching vertices must differ. At <em>d</em> = 2 anything
+          within two steps must differ, and so on. Larger <em>d</em> is always harder.
+        </p>
+        <p class="drawer-copy">
+          Dashed grey lines show pairs that are not joined in the graph but still block
+          each other at this distance.
+        </p>
       </aside>
-
-      <div class="bottom-bar">
-        <button id="restart-button" type="button">Restart Level</button>
-      </div>
-    </main>
+    </div>
 
     <script type="module" src="./app.js"></script>
   </body>
