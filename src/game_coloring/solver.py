@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 
-from .graphs import Graph, build_square_graph
+from .graphs import Graph, is_complete, power_graph
 
 
 ColorState = tuple[int, ...]
@@ -93,24 +93,51 @@ def build_solver(square_graph: Graph, color_count: int):
     return solve
 
 
-def alice_wins(graph: Graph, color_count: int) -> bool:
+def alice_wins(graph: Graph, color_count: int, distance: int = 2) -> bool:
     if color_count <= 0:
         return len(graph) == 0
 
-    square_graph = build_square_graph(graph)
-    solve = build_solver(square_graph, color_count)
-    start_colors = (0,) * len(square_graph)
+    reach_graph = power_graph(graph, distance)
+
+    if is_complete(reach_graph):
+        # Every vertex blocks every other, so each move burns a distinct colour
+        # and nobody is ever trapped while colours remain. Alice wins exactly
+        # when there are at least as many colours as vertices. This retires
+        # whole families: W_n and K_1,n have diameter 2, so they are complete at
+        # every distance >= 2.
+        return color_count >= len(reach_graph)
+
+    solve = build_solver(reach_graph, color_count)
+    start_colors = (0,) * len(reach_graph)
     return solve(start_colors, True)
 
 
-def game_distance_2_chromatic_number(graph: Graph) -> int:
-    for color_count in range(1, len(graph) + 1):
-        if alice_wins(graph, color_count):
+def game_chromatic_number(graph: Graph, distance: int = 2) -> int:
+    if is_complete(power_graph(graph, distance)):
+        return len(graph)
+
+    # Starts at zero so the empty graph reports 0 rather than 1, matching
+    # alice_wins((), 0). For a non-empty graph k=0 always loses, so this only
+    # costs one extra trivial check.
+    #
+    # A plain linear scan on purpose: turning it into a binary search would
+    # assume that Alice keeps winning once she can win, which is unverified for
+    # the distance-d game.
+    for color_count in range(0, len(graph) + 1):
+        if alice_wins(graph, color_count, distance):
             return color_count
+
+    # Unreachable: with k = |V| no vertex can ever be blocked, because a vertex
+    # has at most |V| - 1 neighbours and so cannot see all |V| colours.
     return len(graph) + 1
 
 
-def analyze_game(graph: Graph, color_count: int) -> Analysis:
+def game_distance_2_chromatic_number(graph: Graph) -> int:
+    """The distance-2 case. Kept as the original name."""
+    return game_chromatic_number(graph, 2)
+
+
+def analyze_game(graph: Graph, color_count: int, distance: int = 2) -> Analysis:
     if color_count <= 0:
         return Analysis(
             winner="Alice" if len(graph) == 0 else "Bob",
@@ -120,7 +147,7 @@ def analyze_game(graph: Graph, color_count: int) -> Analysis:
             final_colors=(0,) * len(graph),
         )
 
-    square_graph = build_square_graph(graph)
+    square_graph = power_graph(graph, distance)
     solve = build_solver(square_graph, color_count)
     colors: ColorState = (0,) * len(square_graph)
     alice_turn = True
