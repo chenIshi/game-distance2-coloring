@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"runtime"
@@ -104,7 +103,7 @@ type work struct {
 // Results are written by index rather than appended, so the output is identical
 // regardless of scheduling. The conformance harness diffs this, so a
 // non-deterministic ordering would be worse than useless.
-func runSweep(out io.Writer, maxOrder int, distances []int, workers int) error {
+func runSweep(out io.Writer, maxOrder int, distances []int, workers int, format string) error {
 	var cells []work
 	for _, family := range sweepFamilies {
 		for n := family.from; ; n++ {
@@ -155,9 +154,7 @@ func runSweep(out io.Writer, maxOrder int, distances []int, workers int) error {
 		}
 	}
 
-	encoder := json.NewEncoder(out)
-	encoder.SetIndent("", " ")
-	return encoder.Encode(sweepOutput{Cases: solved})
+	return writeSweep(out, format, solved)
 }
 
 func buildCase(family string, n, distance int, g graph.Graph) (Case, error) {

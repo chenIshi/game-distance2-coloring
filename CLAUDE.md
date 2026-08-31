@@ -102,8 +102,10 @@ go test ./...                 # ~16s, includes the expensive grid
 go run ./cmd/gamecolor -family helm -n 4 -d 3
 go run ./cmd/gamecolor -family cycle -n 7 -k 4
 
-# The research artifact: a JSON grid over every family, parallel across cells
-go run ./cmd/gamecolor -sweep -max-order 12 -distances 1,2,3 > grid.json
+# The research artifact: every family, size, and distance, parallel across cells
+go run ./cmd/gamecolor -sweep -max-order 12 -distances 1,2,3 -format table
+go run ./cmd/gamecolor -sweep -max-order 12 -distances 1,2,3 -format csv > grid.csv
+go run ./cmd/gamecolor -sweep -max-order 12 -distances 1,2,3 > grid.json  # json is the default
 
 # Grade Go against the Python reference (exits non-zero on any disagreement)
 python3 scripts/conformance.py --max-order 8
@@ -226,6 +228,11 @@ cell's colour counts concurrently would compute the expensive above-threshold
 solves the upward scan deliberately never reaches, the same trap as binary
 searching k. Sweep output is written by index so it stays byte-identical
 regardless of scheduling, since the conformance harness diffs it.
+
+`-format` picks the sweep's output: `json` (default, the full detail the harness diffs),
+`table` (families down, sizes across, `*` marking cells the degeneracy shortcut decided),
+or `csv`. Only JSON is contractual — the harness parses it, so changing its shape means
+changing `scripts/conformance.py` too.
 
 ### Tests
 

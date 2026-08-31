@@ -54,6 +54,7 @@ func run() error {
 	maxOrder := flag.Int("max-order", 8, "sweep only: largest graph to include, in vertices")
 	distances := flag.String("distances", "1,2,3", "sweep only: comma-separated distances")
 	workers := flag.Int("workers", 0, "sweep only: parallel workers (0 = one per core)")
+	format := flag.String("format", "json", "sweep only: json, table, or csv")
 	flag.Parse()
 
 	if *sweep {
@@ -61,7 +62,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
-		return runSweep(os.Stdout, *maxOrder, wanted, *workers)
+		return runSweep(os.Stdout, *maxOrder, wanted, *workers, *format)
 	}
 
 	chosen, ok := families[*name]
