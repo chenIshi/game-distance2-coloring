@@ -30,6 +30,12 @@ jobs:
         run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
       - run: go vet ./...
       - run: go test ./...
+      # The browser build has a js/wasm build tag, so the steps above never
+      # compile it. Without this a break in it would only surface at deploy.
+      - name: Browser build
+        run: |
+          GOOS=js GOARCH=wasm go vet ./cmd/wasmsolver
+          ./scripts/build_wasm.sh
 
   conformance:
     name: Go agrees with Python

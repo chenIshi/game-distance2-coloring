@@ -5,9 +5,12 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
-web/data/cases.json
 
 # Go
 /gamecolor
 *.test
 *.out
+
+# Web build artifacts
+web/solver.wasm
+web/wasm_exec.js
