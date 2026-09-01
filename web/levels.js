@@ -10,11 +10,18 @@
 
 export const LEVELS = [
   {
+    id: "path-p3-k3",
+    title: "Start here — three vertices, three colours",
+    family: "path", n: 3, d: 2, k: 3,
+    difficulty: "tutorial",
+    summary: "A gentle first game. At distance 2 all three vertices block each other, so every colour gets used exactly once and you cannot go wrong. Click a circle, then a colour.",
+  },
+  {
     id: "path-p2-k1",
-    title: "Path of 2, one colour",
+    title: "What losing looks like",
     family: "path", n: 2, d: 2, k: 1,
     difficulty: "tutorial",
-    summary: "The smallest possible trap. Colour either vertex and the other one has nothing left.",
+    summary: "Two vertices, one colour. This is unwinnable for Alice by design — colour either vertex and the other has nothing left. Play it once to see how a trap is reported.",
   },
   {
     id: "path-p6-k4",

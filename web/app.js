@@ -15,6 +15,7 @@ import { LEVELS, levelById } from "./levels.js";
 
 const SWATCHES = ["#4c956c", "#d68c45", "#8d5a97", "#2d728f", "#c75146", "#3f7d8c", "#a8763e", "#6b5b95", "#417b5a", "#b5533c", "#57606f", "#8d6e63"];
 const STORAGE_KEY = "distance-d-game-progress";
+const INTRO_KEY = "distance-d-game-seen-intro";
 
 const state = {
   mode: "levels",
@@ -32,6 +33,11 @@ const state = {
   progress: {},
   openDrawer: null,
   moveToken: 0,
+  // Captured from the empty board before anyone moves: whether the position is
+  // winnable at all from the player's side, and how forgiving it is. Without
+  // this, losing a deliberately unwinnable level is indistinguishable from
+  // playing badly, and the player has no idea whether to try again.
+  verdict: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -40,6 +46,7 @@ const el = {
   turn: $("turn-label"), stateLine: $("state-label"), board: $("graph-board"),
   colors: $("color-buttons"), selection: $("selection-label"), message: $("message-label"),
   explain: $("explain-panel"), overlay: $("result-overlay"), overlayEyebrow: $("overlay-eyebrow"),
+  verdict: $("verdict-line"), intro: $("intro"),
   overlayTitle: $("overlay-title"), overlayBody: $("overlay-body"),
   levelList: $("level-list"), backdrop: $("drawer-backdrop"),
   sandboxFamily: $("sandbox-family"), sandboxSize: $("sandbox-size"),
@@ -93,7 +100,28 @@ async function loadSpec(spec) {
   state.colors = new Array(state.graph.order).fill(0);
   state.owners = new Array(state.graph.order).fill(null);
   state.currentPlayer = "Alice";
+  state.verdict = await openingVerdict(spec, state.graph.order);
   await refresh();
+}
+
+// openingVerdict asks the solver about the untouched board. optimalMoves there
+// are exactly Alice's winning openings, so counting the distinct vertices says
+// how much room for error the level allows.
+async function openingVerdict(spec, order) {
+  try {
+    const start = await analyzeState(spec.family, spec.n, spec.d, spec.k,
+      new Array(order).fill(0), true);
+    const vertices = new Set(start.optimalMoves.map((m) => m.vertex));
+    return { aliceWins: start.aliceWins, winningOpenings: vertices.size, order };
+  } catch {
+    return null;
+  }
+}
+
+// Whether the side the player has chosen can win at all, with perfect play.
+function winnableForPlayer() {
+  if (!state.verdict) return null;
+  return state.humanRole === "Alice" ? state.verdict.aliceWins : !state.verdict.aliceWins;
 }
 
 // refresh asks the solver about the current position, then lets the computer
@@ -189,6 +217,8 @@ function renderStatus() {
   const spec = state.spec;
   if (!spec) return;
 
+  renderVerdict();
+
   const done = spec.id && isDone(spec.id, state.humanRole);
   el.chip.textContent = done ? "Cleared" : `d = ${spec.d}, k = ${spec.k}`;
   el.chip.className = done ? "chip is-good" : "chip";
@@ -216,6 +246,40 @@ function renderStatus() {
   el.stateLine.textContent =
     `${state.graph.order - left} of ${state.graph.order} coloured` +
     (state.graph.complete ? " · every pair blocks every other at this distance" : "");
+}
+
+// renderVerdict says up front whether this position is winnable from the
+// player's side, and how forgiving it is. Stated before play, not after, so
+// nobody spends the game wondering whether they are the problem.
+function renderVerdict() {
+  const winnable = winnableForPlayer();
+  if (winnable === null) {
+    el.verdict.textContent = "";
+    el.verdict.className = "verdict-line";
+    return;
+  }
+
+  if (!winnable) {
+    el.verdict.textContent =
+      `This one cannot be won as ${state.humanRole} — no matter how you play. ` +
+      `Seeing why is the point; play it out, or switch sides.`;
+    el.verdict.className = "verdict-line is-lost-cause";
+    return;
+  }
+
+  const { winningOpenings, order } = state.verdict;
+  let room = "";
+  if (state.humanRole === "Alice") {
+    if (winningOpenings === 1) {
+      room = " Exactly one opening move works, out of " + order + " vertices — choose carefully.";
+    } else if (winningOpenings < order) {
+      room = ` Only ${winningOpenings} of ${order} vertices work as an opening.`;
+    } else {
+      room = " Any opening move works; the care is needed later.";
+    }
+  }
+  el.verdict.textContent = `Winnable as ${state.humanRole}.${room}`;
+  el.verdict.className = "verdict-line is-winnable";
 }
 
 function renderBoard() {
@@ -349,13 +413,31 @@ function renderOverlay() {
     return;
   }
   const won = humanWon();
-  el.overlayEyebrow.textContent = won ? "You win" : "You lose";
+  const winnable = winnableForPlayer();
+
   el.overlayTitle.textContent = state.analysis.finished
     ? "Every vertex coloured"
     : `${nameOf(state.analysis.dead[0])} was trapped`;
-  el.overlayBody.textContent = won
-    ? "That was the winning side of this position."
-    : "Try the other side, or the same board with one more colour.";
+
+  if (won) {
+    el.overlayEyebrow.textContent = "You win";
+    el.overlayBody.textContent = winnable
+      ? "That is the winning side of this position."
+      : "You won a position that should have been lost — the opponent slipped.";
+  } else if (winnable === false) {
+    // Losing was the only outcome. Say so plainly, or the player cannot tell
+    // whether to try again.
+    el.overlayEyebrow.textContent = "Lost — as it had to be";
+    el.overlayBody.textContent =
+      `This position is a loss for ${state.humanRole} however it is played, so there was ` +
+      `nothing you could have done differently. Play again to look at it more closely, ` +
+      `or switch sides to see the winning half.`;
+  } else {
+    el.overlayEyebrow.textContent = "You lose";
+    el.overlayBody.textContent =
+      "This one was winnable, so a move somewhere went wrong — usually earlier than it feels. " +
+      "Try again.";
+  }
   el.overlay.classList.remove("hidden");
 }
 
@@ -467,8 +549,29 @@ function nextLevel() {
   loadSpec({ ...next });
 }
 
+function showIntro() {
+  el.intro.classList.remove("hidden");
+}
+
+function dismissIntro() {
+  el.intro.classList.add("hidden");
+  try {
+    window.localStorage.setItem(INTRO_KEY, "yes");
+  } catch {
+    // Not being able to remember is fine; it just shows again next time.
+  }
+}
+
 async function init() {
   loadProgress();
+
+  let seenIntro = false;
+  try {
+    seenIntro = window.localStorage.getItem(INTRO_KEY) === "yes";
+  } catch {
+    seenIntro = false;
+  }
+  if (!seenIntro) showIntro();
 
   FAMILIES.forEach((family) => {
     const option = document.createElement("option");
@@ -505,6 +608,9 @@ async function init() {
     state.mode = "sandbox";
     loadSpec(sandboxSpec());
   });
+
+  $("intro-start").addEventListener("click", dismissIntro);
+  $("show-intro").addEventListener("click", () => { closeDrawer(); showIntro(); });
 
   $("role-alice").classList.add("is-active");
   await loadSpec({ ...LEVELS[0] });

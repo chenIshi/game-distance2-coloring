@@ -18,6 +18,28 @@
         </nav>
       </header>
 
+      <div id="intro" class="intro hidden">
+        <div class="intro-card">
+          <p class="eyebrow">Before you start</p>
+          <h2>Two players, one colour at a time</h2>
+          <ol class="intro-steps">
+            <li><strong>On your turn</strong>, click an uncoloured circle, then click a colour.</li>
+            <li>A colour is only allowed if <strong>no vertex within distance <em>d</em></strong> is already
+                using it. Blocked colours grey out once you pick a vertex.</li>
+            <li><strong>Alice wins</strong> if every vertex ends up coloured.
+                <strong>Bob wins</strong> the moment one uncoloured vertex has no colour left.</li>
+            <li>Alice always moves first. You can play either side.</li>
+          </ol>
+          <p class="intro-note">
+            Some levels <em>cannot</em> be won from your side — that is deliberate, and the page will
+            tell you before you start. Losing those is the lesson, not a mistake.
+          </p>
+          <div class="overlay-actions">
+            <button id="intro-start" type="button">Start playing</button>
+          </div>
+        </div>
+      </div>
+
       <main class="stage">
         <section class="case-head">
           <div class="case-title-row">
@@ -25,6 +47,7 @@
             <span class="chip" id="progress-chip"></span>
           </div>
           <p id="case-summary" class="summary"></p>
+          <p id="verdict-line" class="verdict-line"></p>
           <p id="turn-label" class="turn-line"></p>
           <p id="state-label" class="state-line"></p>
         </section>
@@ -143,6 +166,9 @@
           Dashed grey lines show pairs that are not joined in the graph but still block
           each other at this distance.
         </p>
+        <div class="drawer-actions">
+          <button id="show-intro" type="button">Show the walkthrough again</button>
+        </div>
       </aside>
     </div>
 
