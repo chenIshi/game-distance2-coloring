@@ -34,8 +34,13 @@
             Some levels <em>cannot</em> be won from your side — that is deliberate, and the page will
             tell you before you start. Losing those is the lesson, not a mistake.
           </p>
+          <label class="intro-skip">
+            <input id="intro-remember" type="checkbox" />
+            <span>Don't show this again</span>
+          </label>
           <div class="overlay-actions">
-            <button id="intro-start" type="button">Start playing</button>
+            <button id="intro-walkthrough" type="button" class="is-primary">Walk me through a game</button>
+            <button id="intro-skip" type="button">Skip — let me play</button>
           </div>
         </div>
       </div>
@@ -79,6 +84,15 @@
           <p id="message-label" class="hint-line"></p>
         </section>
       </main>
+
+      <div id="coach" class="coach hidden" aria-live="polite">
+        <div class="coach-row">
+          <span id="coach-step" class="coach-step"></span>
+          <button id="coach-quit" type="button" class="coach-quit">Skip tutorial</button>
+        </div>
+        <p id="coach-text" class="coach-text"></p>
+        <button id="coach-next" type="button" class="coach-next hidden">Next</button>
+      </div>
 
       <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
 
@@ -167,7 +181,8 @@
           each other at this distance.
         </p>
         <div class="drawer-actions">
-          <button id="show-intro" type="button">Show the walkthrough again</button>
+          <button id="show-intro" type="button">Show the rules again</button>
+          <button id="start-walkthrough" type="button">Replay the walkthrough</button>
         </div>
       </aside>
     </div>

@@ -182,3 +182,63 @@ body {
 .intro-steps li { font-size: 14px; }
 .intro-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; font-size: 13px;
   background: var(--bg); color: var(--muted); }
+
+/* Coach marks for the walkthrough. */
+.coach {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 14px; z-index: 8;
+  width: min(560px, calc(100vw - 24px));
+  background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 12px 14px;
+}
+.coach-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.coach-step {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--accent);
+}
+.coach-quit {
+  border: none; background: none; color: var(--muted);
+  font-size: 12px; cursor: pointer; text-decoration: underline; padding: 0;
+}
+.coach-quit:hover { color: var(--ink); }
+.coach-text { margin: 6px 0 0; font-size: 14px; }
+.coach-next {
+  margin-top: 10px; padding: 7px 14px; border-radius: 8px;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  font-size: 13px; cursor: pointer;
+}
+
+/* The ring drawn inside the SVG, so it sits above the board rather than
+   fighting it from an HTML layer. */
+.coach-ring {
+  fill: none; stroke: var(--accent); stroke-width: 3; opacity: .9;
+  animation: coach-pulse 1.6s ease-in-out infinite;
+}
+@keyframes coach-pulse {
+  0%, 100% { r: 24; opacity: .85; }
+  50%      { r: 29; opacity: .35; }
+}
+.color-button.coach-lit {
+  outline: 3px solid var(--accent); outline-offset: 3px;
+  animation: coach-glow 1.6s ease-in-out infinite;
+}
+@keyframes coach-glow {
+  0%, 100% { outline-color: var(--accent); }
+  50%      { outline-color: transparent; }
+}
+
+/* Give the coach card room so it never covers the colour buttons. */
+body:has(.coach:not(.hidden)) .stage { padding-bottom: 130px; }
+
+.intro-skip {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 14px; font-size: 13px; color: var(--muted); cursor: pointer;
+}
+.intro-skip input { width: 15px; height: 15px; cursor: pointer; }
+.overlay-actions button.is-primary {
+  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 620;
+}
+.overlay-actions button.is-primary:hover { color: #fff; opacity: .92; }
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-ring, .color-button.coach-lit { animation: none; }
+}

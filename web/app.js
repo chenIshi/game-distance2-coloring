@@ -38,6 +38,127 @@ const state = {
   // this, losing a deliberately unwinnable level is indistinguishable from
   // playing badly, and the player has no idea whether to try again.
   verdict: null,
+  tutorial: null,
+};
+
+// The walkthrough.
+//
+// Steps are reactive rather than scripted: each one describes what to look at,
+// and says when it is satisfied by reading the position. Nothing is forced and
+// no move sequence is assumed, so the player can poke around without derailing
+// it, and a step can never wait for something that already happened.
+const TUTORIAL_LEVEL = "path-p3-k3";
+
+const coloured = () => state.colors.filter((c) => c !== 0).length;
+
+const TUTORIAL_STEPS = [
+  {
+    text: "This is the board. Three vertices in a row — and at distance 2 every one of them blocks every other, so all three will need different colours.",
+    highlight: { vertices: "all" },
+    manual: true,
+  },
+  {
+    text: "Your turn. Click any circle to select it. The one in the middle is as good as either end here.",
+    highlight: { vertices: "uncoloured" },
+    done: () => state.selected !== null,
+  },
+  {
+    text: "Selected. The colour buttons below lit up — those are the colours still legal for that vertex. Click one.",
+    highlight: { colors: true },
+    // Waits for the computer's reply too, so the next step can talk about it
+    // truthfully rather than a third of a second early.
+    done: () => coloured() >= 2,
+  },
+  {
+    text: "The computer replied. Look at the two colours now on the board: neither is available to the last vertex, because it is within distance 2 of both.",
+    highlight: { vertices: "coloured" },
+    done: () => coloured() >= 2,
+    manual: true,
+  },
+  {
+    text: "One vertex left. Select it and watch the colour buttons — only one is still legal.",
+    highlight: { vertices: "uncoloured" },
+    done: () => state.selected !== null || coloured() >= 3,
+  },
+  {
+    text: "Play it to finish the board.",
+    highlight: { colors: true },
+    done: () => coloured() >= 3,
+  },
+  {
+    text: "Every vertex coloured, so Alice wins. Bob's job is the opposite: leave one vertex with no legal colour at all. Try the next level to see that happen.",
+    highlight: {},
+    manual: true,
+    last: true,
+  },
+];
+
+function startTutorial() {
+  const level = levelById(TUTORIAL_LEVEL);
+  state.tutorial = { step: 0 };
+  state.humanRole = "Alice";
+  $("role-alice").classList.add("is-active");
+  $("role-bob").classList.remove("is-active");
+  loadSpec({ ...level });
+}
+
+function stopTutorial() {
+  if (!state.tutorial) return;
+  state.tutorial = null;
+  el.coach.classList.add("hidden");
+  render();
+}
+
+function currentStep() {
+  if (!state.tutorial) return null;
+  return TUTORIAL_STEPS[state.tutorial.step] || null;
+}
+
+// advanceTutorial is called after every render, so a step whose condition is
+// already true when it opens does not strand the player on it.
+function advanceTutorial() {
+  const step = currentStep();
+  if (!step || step.manual || !step.done) return;
+  if (step.done()) {
+    state.tutorial.step += 1;
+    renderCoach();
+    advanceTutorial();
+  }
+}
+
+function renderCoach() {
+  if (state.tutorial && state.tutorial.step >= TUTORIAL_STEPS.length) {
+    stopTutorial();
+    return;
+  }
+  const step = currentStep();
+  if (!step) {
+    el.coach.classList.add("hidden");
+    return;
+  }
+  el.coach.classList.remove("hidden");
+  el.coachStep.textContent = `Step ${state.tutorial.step + 1} of ${TUTORIAL_STEPS.length}`;
+  el.coachText.textContent = step.text;
+  el.coachNext.classList.toggle("hidden", !step.manual);
+  el.coachNext.textContent = step.last ? "Finish" : "Next";
+}
+
+// highlightedVertices returns the vertices the current step wants to draw
+// attention to, so renderBoard can ring them.
+function highlightedVertices() {
+  const step = currentStep();
+  if (!step || !step.highlight || !step.highlight.vertices) return new Set();
+  const which = step.highlight.vertices;
+  const all = state.colors.map((_, i) => i);
+  if (which === "all") return new Set(all);
+  if (which === "uncoloured") return new Set(all.filter((v) => state.colors[v] === 0));
+  if (which === "coloured") return new Set(all.filter((v) => state.colors[v] !== 0));
+  return new Set();
+}
+
+const coachWantsColors = () => {
+  const step = currentStep();
+  return Boolean(step && step.highlight && step.highlight.colors);
 };
 
 const $ = (id) => document.getElementById(id);
@@ -47,6 +168,8 @@ const el = {
   colors: $("color-buttons"), selection: $("selection-label"), message: $("message-label"),
   explain: $("explain-panel"), overlay: $("result-overlay"), overlayEyebrow: $("overlay-eyebrow"),
   verdict: $("verdict-line"), intro: $("intro"),
+  coach: $("coach"), coachText: $("coach-text"), coachStep: $("coach-step"),
+  coachNext: $("coach-next"),
   overlayTitle: $("overlay-title"), overlayBody: $("overlay-body"),
   levelList: $("level-list"), backdrop: $("drawer-backdrop"),
   sandboxFamily: $("sandbox-family"), sandboxSize: $("sandbox-size"),
@@ -211,6 +334,8 @@ function render() {
   renderExplanation();
   renderOverlay();
   renderLevelList();
+  renderCoach();
+  advanceTutorial();
 }
 
 function renderStatus() {
@@ -288,6 +413,7 @@ function renderBoard() {
 
   const svg = (tag) => document.createElementNS("http://www.w3.org/2000/svg", tag);
   const dead = new Set(state.analysis ? state.analysis.dead : []);
+  const spotlight = highlightedVertices();
 
   // Conflict-only pairs first, so real edges draw on top of them.
   const realEdge = new Set();
@@ -314,6 +440,15 @@ function renderBoard() {
     if (color) group.classList.add("is-colored");
     if (dead.has(vertex)) group.classList.add("is-dead");
     if (state.selected === vertex) group.classList.add("is-selected");
+
+    if (spotlight.has(vertex)) {
+      const ring = svg("circle");
+      ring.setAttribute("cx", point.x);
+      ring.setAttribute("cy", point.y);
+      ring.setAttribute("r", 26);
+      ring.setAttribute("class", "coach-ring");
+      group.appendChild(ring);
+    }
 
     const circle = svg("circle");
     circle.setAttribute("cx", point.x);
@@ -371,6 +506,7 @@ function renderColorButtons() {
     const usable = state.selected !== null && allowed.has(color);
     button.disabled = !usable;
     if (state.selected !== null && !usable) button.classList.add("is-blocked");
+    if (usable && coachWantsColors()) button.classList.add("coach-lit");
     button.addEventListener("click", () => humanMove(state.selected, color));
     el.colors.appendChild(button);
   }
@@ -460,6 +596,7 @@ function renderLevelList() {
     card.addEventListener("click", () => {
       closeDrawer();
       state.mode = "levels";
+      if (state.tutorial && level.id !== TUTORIAL_LEVEL) stopTutorial();
       loadSpec({ ...level });
     });
     el.levelList.appendChild(card);
@@ -555,6 +692,7 @@ function showIntro() {
 
 function dismissIntro() {
   el.intro.classList.add("hidden");
+  if (!$("intro-remember").checked) return;
   try {
     window.localStorage.setItem(INTRO_KEY, "yes");
   } catch {
@@ -609,8 +747,16 @@ async function init() {
     loadSpec(sandboxSpec());
   });
 
-  $("intro-start").addEventListener("click", dismissIntro);
+  $("intro-skip").addEventListener("click", dismissIntro);
+  $("intro-walkthrough").addEventListener("click", () => { dismissIntro(); startTutorial(); });
   $("show-intro").addEventListener("click", () => { closeDrawer(); showIntro(); });
+  $("start-walkthrough").addEventListener("click", () => { closeDrawer(); startTutorial(); });
+  $("coach-quit").addEventListener("click", stopTutorial);
+  $("coach-next").addEventListener("click", () => {
+    if (currentStep() && currentStep().last) { stopTutorial(); return; }
+    state.tutorial.step += 1;
+    render();
+  });
 
   $("role-alice").classList.add("is-active");
   await loadSpec({ ...LEVELS[0] });
